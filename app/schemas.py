@@ -7,7 +7,7 @@ from uuid import UUID
 
 class UserBase(BaseModel):
     email: str | None = None
-    disabled: bool | None = None
+    # disabled: bool | None = None
 
 class UserCreate(UserBase):
     password: str
@@ -22,7 +22,6 @@ class UserModel(BaseModel):
     email: str
     id: UUID
     email_verified: Optional[bool] = False
-    username: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

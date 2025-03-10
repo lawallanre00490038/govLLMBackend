@@ -44,6 +44,38 @@ async def root():
     return {"message": "Hello World"}
 
 
+
+@app.post("/register/", response_model=RegisterResponseModel)
+async def register_user(user: UserInDB, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    db_user = User(
+        email=user.email,
+        password=get_password_hash(user.password),
+    )
+
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    return {
+        "status": True,
+        "message": "User created successfully",
+        "data": {
+            "user": {
+                "email": db_user.email,
+                "id": str(db_user.id),
+                "email_verified": getattr(db_user, "email_verified", False),
+                "created_at": db_user.created_at.isoformat() if hasattr(db_user, "created_at") else None,
+                "updated_at": db_user.updated_at.isoformat() if hasattr(db_user, "updated_at") else None
+            }
+        }
+    }
+
+
+
 @app.post("/login", response_model=LoginResponseModel)
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
@@ -101,8 +133,7 @@ async def google_auth_callback(request: Request, db: Session = Depends(get_db)):
         # Register the user if not found
         new_user = User(
             email=user_info["email"],
-            username=user_info.get("name", None),
-            password="",  # No password since it's OAuth
+            password="", 
             email_verified=True
         )
         db.add(new_user)
@@ -120,7 +151,6 @@ async def google_auth_callback(request: Request, db: Session = Depends(get_db)):
                 "email": user.email,
                 "id": str(user.id),
                 "email_verified": user.email_verified,
-                "username": user.username,
                 "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
                 "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
             },
@@ -130,36 +160,6 @@ async def google_auth_callback(request: Request, db: Session = Depends(get_db)):
     }
 
 
-
 @app.get("/users/me/")
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
     return current_user
-
-@app.post("/register/", response_model=RegisterResponseModel)
-async def register_user(user: UserInDB, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    db_user = User(
-        email=user.email,
-        password=get_password_hash(user.password),
-        disabled=user.disabled or False
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-
-    return {
-        "status": True,
-        "message": "User created successfully",
-        "data": {
-            "user": {
-                "email": db_user.email,
-                "id": str(db_user.id),
-                "email_verified": True,
-                "created_at": db_user.created_at.isoformat() if hasattr(db_user, "created_at") else None,
-                "updated_at": db_user.updated_at.isoformat() if hasattr(db_user, "updated_at") else None
-            }
-        }
-    }

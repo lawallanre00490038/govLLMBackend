@@ -1,14 +1,18 @@
-from sqlalchemy import Column, String, Boolean
+from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
+from datetime import datetime, timezone
 from .database import Base
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    # username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
-    # full_name = Column(String, nullable=True)
     password = Column(String, nullable=False)
     disabled = Column(Boolean, default=False)
+    email_verified = Column(Boolean, default=True)
+    
+    # Use timezone-aware datetime
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
