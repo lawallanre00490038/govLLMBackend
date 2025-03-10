@@ -5,3 +5,4 @@ passlib
 bcrypt 
 python-dotenv
 pyjwt
+Authlib
