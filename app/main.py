@@ -157,7 +157,7 @@ async def register_user(user: UserInDB, db: Session = Depends(get_db)):
             "user": {
                 "email": db_user.email,
                 "id": str(db_user.id),
-                "email_verified": False,
+                # "email_verified": true,
                 "created_at": db_user.created_at.isoformat() if hasattr(db_user, "created_at") else None,
                 "updated_at": db_user.updated_at.isoformat() if hasattr(db_user, "updated_at") else None
             }
