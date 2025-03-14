@@ -1,64 +1,59 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-# from fastapi.security import OAuth2PasswordRequestForm
-from authlib.integrations.starlette_client import OAuth
+from fastapi import APIRouter, FastAPI, Depends, HTTPException, status
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
+import httpx
+
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from fastapi import Request
+from starlette.requests import Request
+from starlette.middleware.sessions import SessionMiddleware
+from authlib.integrations.starlette_client import OAuth, OAuthError
+from .config import CLIENT_ID, CLIENT_SECRET, SECRET_KEY
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
 from .database import engine, Base, get_db
 from .models import User
 from fastapi.middleware.cors import CORSMiddleware
 from .schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel
 from .auth import authenticate_user, create_access_token, get_current_active_user, get_password_hash
-from starlette.middleware.sessions import SessionMiddleware
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
+
+from dotenv import load_dotenv
 
 Base.metadata.create_all(bind=engine)
-google_client = os.getenv("GOOGLE_CLIENT_ID")
-google_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-secret_key = os.environ.get("SECRET_KEY")
-
-print("The secret is:",  secret_key)
+load_dotenv()
 
 app = FastAPI()
+router = APIRouter()
 
-app.add_middleware(SessionMiddleware, secret_key=secret_key, same_site="lax", https_only=False)
 
+oauth = OAuth()
 
+# Allow requests from your frontend
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000"
+]
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*", "http://localhost:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
 
 
-# Google OAuth Setup
-oauth = OAuth()
-oauth.register(
-    name="google",
-    client_id=google_client,
-    client_secret=google_secret,
-    authorize_url="https://accounts.google.com/o/oauth2/auth",
-    access_token_url="https://oauth2.googleapis.com/token",
-    authorize_params={"response_type": "id_token token", "scope": "openid email profile"},
-    client_kwargs={"scope": "openid email profile"},
-    state_generator=lambda: "random_state_here", 
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration"
-)
-
-
-
-@app.get("/")
-async def root():
+@router.get("/home/")
+async def home():
     return {"message": "Hello World"}
 
 
 
-@app.post("/register/", response_model=RegisterResponseModel)
+@router.post("/register/", response_model=RegisterResponseModel)
 async def register_user(user: UserInDB, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
@@ -89,7 +84,7 @@ async def register_user(user: UserInDB, db: Session = Depends(get_db)):
 
 
 
-@app.post("/login", response_model=LoginResponseModel)
+@router.post("/login", response_model=LoginResponseModel)
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
 ):
@@ -125,99 +120,90 @@ async def login_for_access_token(
 
 
 
-@app.get("/auth/google")
+@router.get("/login/google")
 async def google_login(request: Request):
-    redirect_uri = request.url_for("google_auth_callback") 
-    print("Redirect URI:", redirect_uri)
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    redirect_uri = request.url_for('auth')
+    google_auth_url = f"https://accounts.google.com/o/oauth2/auth?client_id={CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=openid email profile"
 
-# @app.get("/auth/google/callback")
-# async def google_auth_callback(request: Request, db: Session = Depends(get_db)):
-#     token = await oauth.google.authorize_access_token(request)
-#     # user_info = token.get("userinfo")
-#     user_info = await oauth.google.parse_id_token(request, token)
-#     print(user_info)
+    return RedirectResponse(url=google_auth_url)
 
-#     if not user_info:
-#         raise HTTPException(status_code=400, detail="Failed to retrieve user information")
+@router.get("/auth")
+async def auth(code: str, request: Request):
+    token_request_uri = "https://oauth2.googleapis.com/token"
+    data = {
+        'code': code,
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'redirect_uri': request.url_for('auth'),
+        'grant_type': 'authorization_code',
+    }
 
-#     # Check if user already exists
-#     user = db.query(User).filter(User.email == user_info["email"]).first()
-#     if not user:
-#         # Register the user if not found
-#         new_user = User(
-#             email=user_info["email"],
-#             password="", 
-#             email_verified=True
-#         )
-#         db.add(new_user)
-#         db.commit()
-#         db.refresh(new_user)
-#         user = new_user
+    async with httpx.AsyncClient() as client:
+        response = await client.post(token_request_uri, data=data)
+        response.raise_for_status()
+        token_response = response.json()
 
-#     access_token = create_access_token(data={"sub": user.email})
+    id_token_value = token_response.get('id_token')
+    if not id_token_value:
+        raise HTTPException(status_code=400, detail="Missing id_token in response.")
 
-#     return {
-#         "status": True,
-#         "message": "User login successful via Google",
-#         "data": {
-#             "user": {
-#                 "email": user.email,
-#                 "id": str(user.id),
-#                 "email_verified": user.email_verified,
-#                 "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-#                 "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
-#             },
-#             "access_token": access_token,
-#             "token_type": "bearer"
-#         }
-#     }
+    try:
+        id_info = id_token.verify_oauth2_token(
+            id_token_value, requests.Request(), 
+            CLIENT_ID,
+            clock_skew_in_seconds=2
+        )
 
-@app.get("/auth/google/callback")
-async def google_auth_callback(request: Request, db: Session = Depends(get_db)):
-    print("Received request:", request.query_params)
-    token = await oauth.google.authorize_access_token(request)
-    print("OAuth Token Response:", token)
+        payload = {
+            "sub": id_info.get('sub'),
+            "email": id_info.get('email'),
+            "name": id_info.get('name'),
+            "picture": id_info.get('picture'),
+            "email_verified": id_info.get('email_verified'),
+        }
 
-    if "id_token" in token:
-        user_info = await oauth.google.parse_id_token(request, token)
-    else:
-        # Fallback: Manually fetch user info
-        resp = await oauth.google.get("https://www.googleapis.com/oauth2/v1/userinfo", token=token)
-        user_info = resp.json()
+        request.session["user_data"] = payload 
+        return RedirectResponse(url=request.url_for('token'))
 
-    print("User Info:", user_info)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid id_token: {str(e)}")
 
-    if not user_info:
-        raise HTTPException(status_code=400, detail="Failed to retrieve user information")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    user = db.query(User).filter(User.email == user_info["email"]).first()
-    if not user:
-        new_user = User(email=user_info["email"], password="", email_verified=True)
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        user = new_user
 
-    access_token = create_access_token(data={"sub": user.email})
+@router.get("/token")
+async def token(request: Request):
+    user_name = request.session.get('user_data')
+    print(user_name)
+    if not user_name:
+        raise HTTPException(status_code=401, detail="User not authenticated")
 
-    return {
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(
+        data={"sub": user_name['email']}, expires_delta=access_token_expires
+    )
+
+    response_data = {
         "status": True,
-        "message": "User login successful via Google",
+        "message": "User login successful",
         "data": {
             "user": {
-                "email": user.email,
-                "id": str(user.id),
-                "email_verified": user.email_verified,
-                "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-                "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                "email": user_name['email'],
+                "name": user_name['name'],
+                "picture": user_name['picture'],
+                "email_verified": user_name['email_verified'],
             },
             "access_token": access_token,
             "token_type": "bearer"
         }
     }
-
+    return(LoginResponseModel(**response_data))
+    # return RedirectResponse(url=request.url_for('home')) 
 
 @app.get("/users/me/")
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
     return current_user
+
+
+app.include_router(router, prefix="/api/authentication", tags=["auth"])

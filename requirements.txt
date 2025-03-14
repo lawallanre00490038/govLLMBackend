@@ -6,3 +6,4 @@ bcrypt
 python-dotenv
 pyjwt
 Authlib
+fastapi-authlib

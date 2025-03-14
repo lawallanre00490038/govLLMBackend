@@ -36,7 +36,7 @@ class LoginResponseModel(BaseModel):
     data: dict
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class RegisterResponseModel(BaseModel):
     status: bool = True
@@ -44,7 +44,7 @@ class RegisterResponseModel(BaseModel):
     data: dict | list | str | int | float | bool | None = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
