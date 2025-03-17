@@ -57,6 +57,11 @@ async def home(request: Request):
 
 @router.post("/register/", response_model=RegisterResponseModel)
 async def register_user(user: UserInDB, db: Session = Depends(get_db)):
+    """
+        Register a new user.
+        If the email already exists, it will raise a 400 error.
+        If the registration is successful, it will return the user data.
+    """
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -90,6 +95,11 @@ async def register_user(user: UserInDB, db: Session = Depends(get_db)):
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
 ):
+    """
+        Login a user.
+        If the email and password are correct, it will return the user data and access token.
+        If the email and password are incorrect, it will raise a 401 error.
+    """
     user = authenticate_user(db, form_data.email, form_data.password)
     if not user:
         raise HTTPException(
@@ -124,6 +134,9 @@ async def login_for_access_token(
 
 @router.get("/login/google")
 async def google_login(request: Request):
+    """
+        Redirect the user to Google login page.
+    """
     redirect_uri = request.url_for('auth')
     google_auth_url = f"https://accounts.google.com/o/oauth2/auth?client_id={CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=openid email profile"
 
@@ -131,6 +144,10 @@ async def google_login(request: Request):
 
 @router.get("/auth")
 async def auth(code: str, request: Request):
+    """
+        Handle the Google login callback.
+        Responsible for exchanging the code for an access token and validating the token.
+    """
     token_request_uri = "https://oauth2.googleapis.com/token"
     data = {
         'code': code,
@@ -176,6 +193,11 @@ async def auth(code: str, request: Request):
 
 @router.get("/token")
 async def token(request: Request):
+    """
+        Handle the Google login callback.
+        If the login is successful, it will return the user data and access token.
+        If the login is not successful, it will raise a 400 error.
+    """
     user_data = request.session.get('user_data')
     db = SessionLocal()
     if not user_data:
@@ -214,19 +236,6 @@ async def token(request: Request):
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-
-    # existing_user = db.query(User).filter(User.email == user_data.email).first()
-    # if existing_user:
-    #     raise HTTPException(status_code=400, detail="Email already registered, Please sign in")
-    # db_user = User(
-    #     email=user_name.email,
-    #     password=get_password_hash(user_name.password),
-    # )
-    # db.add(db_user)
-    # db.commit()
-    # db.refresh(db_user)
-
 
 @app.get("/users/me/")
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
