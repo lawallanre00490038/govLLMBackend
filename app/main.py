@@ -12,11 +12,11 @@ from .config import CLIENT_ID, CLIENT_SECRET, SECRET_KEY
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-from .database import engine, Base, get_db
+from .database import engine, Base, get_db, SessionLocal
 from .models import User
 from fastapi.middleware.cors import CORSMiddleware
-from .schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel
-from .auth import authenticate_user, create_access_token, get_current_active_user, get_password_hash
+from .schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel, GooglePayload
+from .auth import authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
 
 
 from dotenv import load_dotenv
@@ -47,11 +47,13 @@ app.add_middleware(
 )
 
 
-@router.get("/home/")
-async def home():
-    return {"message": "Hello World"}
-
-
+@router.get("/home")
+async def home(request: Request):
+    user_data = request.session.get("user_data")
+    if not user_data:
+        return {"message": "No session data, user not authenticated"}
+    
+    return {"message": "User is authenticated", "user_data": user_data}
 
 @router.post("/register/", response_model=RegisterResponseModel)
 async def register_user(user: UserInDB, db: Session = Depends(get_db)):
@@ -154,7 +156,7 @@ async def auth(code: str, request: Request):
             clock_skew_in_seconds=2
         )
 
-        payload = {
+        payload: GooglePayload = {
             "sub": id_info.get('sub'),
             "email": id_info.get('email'),
             "name": id_info.get('name'),
@@ -174,32 +176,57 @@ async def auth(code: str, request: Request):
 
 @router.get("/token")
 async def token(request: Request):
-    user_name = request.session.get('user_data')
-    print(user_name)
-    if not user_name:
+    user_data = request.session.get('user_data')
+    db = SessionLocal()
+    if not user_data:
         raise HTTPException(status_code=401, detail="User not authenticated")
+    try:
+        user =  authenticate_google_user(db, user_data["email"])
+        if user:
+            print("Following the path of existing user")
+        else:
+            print("Following the path of new user")
+            add_google_user(db, user_data["email"])
+            user =  authenticate_google_user(db, user_data["email"])
+        
+        access_token_expires = timedelta(minutes=30)
+        access_token = create_access_token(
+            data={"sub": user_data["email"]}, expires_delta=access_token_expires
+        )
+        response_data = {
+            "status": True,
+            "message": "User login successful",
+            "data": {
+                "user": {
+                    "email": user.email,
+                    "id": str(user.id),
+                    "email_verified": getattr(user, "email_verified", False),
+                    "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
+                    "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                },
+                "access_token": access_token,
+                "token_type": "bearer"
+            }
+            }
+        # print(LoginResponseModel(**response_data))
+        # return RedirectResponse(url=request.url_for('home')) 
+        return LoginResponseModel(**response_data)
+    except Exception as e:
+        print("The error is", e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    access_token_expires = timedelta(minutes=30)
-    access_token = create_access_token(
-        data={"sub": user_name['email']}, expires_delta=access_token_expires
-    )
 
-    response_data = {
-        "status": True,
-        "message": "User login successful",
-        "data": {
-            "user": {
-                "email": user_name['email'],
-                "name": user_name['name'],
-                "picture": user_name['picture'],
-                "email_verified": user_name['email_verified'],
-            },
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-    }
-    return(LoginResponseModel(**response_data))
-    # return RedirectResponse(url=request.url_for('home')) 
+    # existing_user = db.query(User).filter(User.email == user_data.email).first()
+    # if existing_user:
+    #     raise HTTPException(status_code=400, detail="Email already registered, Please sign in")
+    # db_user = User(
+    #     email=user_name.email,
+    #     password=get_password_hash(user_name.password),
+    # )
+    # db.add(db_user)
+    # db.commit()
+    # db.refresh(db_user)
+
 
 @app.get("/users/me/")
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):

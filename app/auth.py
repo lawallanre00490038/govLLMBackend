@@ -9,9 +9,10 @@ from jwt.exceptions import InvalidTokenError
 
 from .database import SessionLocal
 from .models import User
-from .schemas import UserInDB, Token, TokenData
+from .schemas import UserInDB, TokenData
+from .config import SECRET_KEY
 
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -39,7 +40,6 @@ def authenticate_user(db: Session, email: str, password: str):
     if not user or not verify_password(password, user.password):
         return None
     return user
-
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
@@ -70,3 +70,17 @@ async def get_current_active_user(current_user: Annotated[UserInDB, Depends(get_
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+# Google OAuth2 login and registration
+def authenticate_google_user(db: Session, email: str):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return None
+    return user
+def add_google_user(db: Session, email: str):
+    user = User(email=email)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

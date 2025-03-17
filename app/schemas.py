@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -53,3 +53,9 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str | None = None
+    
+class GooglePayload(BaseModel):
+    sub: Optional[Any] = None
+    name: str
+    picture: str
+    email_verified: bool
