@@ -10,3 +10,4 @@ fastapi-authlib
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
+sib_api_v3_sdk

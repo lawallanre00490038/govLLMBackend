@@ -11,5 +11,6 @@ if __name__ == "__main__":
         "app.main:app", 
         host=HOST, 
         port=8000, 
+        PORT = int(os.getenv("PORT", 8000)),
         reload=(ENV == "development"), 
     )
