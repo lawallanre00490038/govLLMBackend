@@ -10,7 +10,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app", 
         host=HOST, 
-        port=8000, 
-        PORT = int(os.getenv("PORT", 8000)),
+        port=int(os.getenv("PORT", 8000)),
         reload=(ENV == "development"), 
     )
