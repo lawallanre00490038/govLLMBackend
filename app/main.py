@@ -230,8 +230,6 @@ async def token(request: Request):
                 "token_type": "bearer"
             }
             }
-        # print(LoginResponseModel(**response_data))
-        # return RedirectResponse(url=request.url_for('home')) 
         return LoginResponseModel(**response_data)
     except Exception as e:
         print("The error is", e)
