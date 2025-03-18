@@ -9,6 +9,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app", 
         host=HOST, 
-        port=PORT, 
+        port=8000, 
         reload=(ENV == "development")
     )
