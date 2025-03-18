@@ -21,7 +21,7 @@ class UserInDB(UserBase):
 class UserModel(BaseModel):
     email: str
     id: UUID
-    email_verified: Optional[bool] = False
+    is_email_verified: Optional[bool] = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -58,4 +58,4 @@ class GooglePayload(BaseModel):
     sub: Optional[Any] = None
     name: str
     picture: str
-    email_verified: bool
+    is_email_verified: bool

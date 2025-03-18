@@ -76,7 +76,7 @@ async def register_user(
     db_user = User(
         email=user.email,
         password=get_password_hash(user.password),
-        email_verified=False,
+        is_email_verified=False,
         verification_token=verification_token
     )
 
@@ -94,7 +94,7 @@ async def register_user(
                 "user": {
                     "id": str(db_user.id),
                     "email": db_user.email,
-                    "email_verified": getattr(db_user, "email_verified"),
+                    "is_email_verified": getattr(db_user, "is_email_verified"),
                 }
             },
         }
@@ -108,7 +108,7 @@ async def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    user.email_verified = True
+    user.is_email_verified = True
     user.verification_token = None 
     db.commit()
 
@@ -124,7 +124,7 @@ async def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
                 "user": {
                     "email": user.email,
                     "id": str(user.id),
-                    "email_verified": getattr(user, "email_verified"),
+                    "is_email_verified": getattr(user, "is_email_verified"),
                     "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
                     "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
                 }
@@ -169,7 +169,7 @@ async def login_for_access_token(
             "user": {
                 "email": user.email,
                 "id": str(user.id),
-                "email_verified": getattr(user, "email_verified", False),
+                "is_email_verified": getattr(user, "is_email_verified", False),
                 "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
                 "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
             },
@@ -227,7 +227,7 @@ async def auth(code: str, request: Request):
             "email": id_info.get('email'),
             "name": id_info.get('name'),
             "picture": id_info.get('picture'),
-            "email_verified": id_info.get('email_verified'),
+            "is_email_verified": id_info.get('is_email_verified'),
             "verification_token": str(uuid.uuid4())
         }
 
@@ -268,7 +268,7 @@ async def token(request: Request):
                     "user": {
                         "email": user.email,
                         "id": str(user.id),
-                        "email_verified": getattr(user, "email_verified"),
+                        "is_email_verified": getattr(user, "is_email_verified"),
                         "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
                         "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
                     },
@@ -289,7 +289,7 @@ async def token(request: Request):
                     "user": {
                         "id": str(user_data["sub"]),
                         "email": user_data["email"],
-                        "email_verified": getattr(user_data, "email_verified", False),
+                        "is_email_verified": getattr(user_data, "is_email_verified", False),
                     }
                 },
             }

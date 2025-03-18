@@ -11,7 +11,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False, default="")
     disabled = Column(Boolean, default=False)
-    email_verified = Column(Boolean, default=False)
+    is_email_verified = Column(Boolean, default=False)
     verification_token = Column(String, nullable=True)
     
     # Use timezone-aware datetime
