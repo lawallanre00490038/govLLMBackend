@@ -34,7 +34,6 @@ oauth = OAuth()
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://yourfrontend.com",
     "https://govllmbackend.onrender.com"
 ]
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -47,7 +46,7 @@ app.add_middleware(
 )
 
 
-@router.get("/home")
+@router.get("/home", include_in_schema=False)
 async def home(request: Request):
     user_data = request.session.get("user_data")
     if not user_data:
@@ -55,7 +54,7 @@ async def home(request: Request):
     
     return {"message": "User is authenticated", "user_data": user_data}
 
-@router.post("/register/", response_model=RegisterResponseModel)
+@router.post("/signup/", response_model=RegisterResponseModel)
 async def register_user(user: UserInDB, db: Session = Depends(get_db)):
     """
         Register a new user.
@@ -91,7 +90,7 @@ async def register_user(user: UserInDB, db: Session = Depends(get_db)):
 
 
 
-@router.post("/login", response_model=LoginResponseModel)
+@router.post("/signin", response_model=LoginResponseModel)
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
 ):
@@ -132,7 +131,7 @@ async def login_for_access_token(
 
 
 
-@router.get("/login/google")
+@router.get("/signin/google")
 async def google_login(request: Request):
     """
         Redirect the user to Google login page.
@@ -142,7 +141,7 @@ async def google_login(request: Request):
 
     return RedirectResponse(url=google_auth_url)
 
-@router.get("/auth")
+@router.get("/auth", include_in_schema=False)
 async def auth(code: str, request: Request):
     """
         Handle the Google login callback.
@@ -191,7 +190,7 @@ async def auth(code: str, request: Request):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-@router.get("/token")
+@router.get("/token", include_in_schema=False)
 async def token(request: Request):
     """
         Handle the Google login callback.
