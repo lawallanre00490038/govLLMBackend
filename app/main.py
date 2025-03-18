@@ -1,8 +1,9 @@
-from fastapi import APIRouter, FastAPI, Depends, HTTPException, status
+from fastapi import APIRouter, FastAPI, Depends, HTTPException, status, Query
 from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import RedirectResponse
 import httpx
-
+import uuid
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from starlette.requests import Request
@@ -11,14 +12,12 @@ from authlib.integrations.starlette_client import OAuth, OAuthError
 from .config import CLIENT_ID, CLIENT_SECRET, SECRET_KEY
 from google.oauth2 import id_token
 from google.auth.transport import requests
-
 from .database import engine, Base, get_db, SessionLocal
 from .models import User
 from fastapi.middleware.cors import CORSMiddleware
 from .schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel, GooglePayload
-from .auth import authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
-
-
+from .auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
+from .email import send_verification_email
 from dotenv import load_dotenv
 
 Base.metadata.create_all(bind=engine)
@@ -46,51 +45,96 @@ app.add_middleware(
 )
 
 
-@router.get("/home", include_in_schema=False)
-async def home(request: Request):
-    user_data = request.session.get("user_data")
-    if not user_data:
-        return {"message": "No session data, user not authenticated"}
-    
-    return {"message": "User is authenticated", "user_data": user_data}
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_openapi_schema():
+    """
+    Returns the OpenAPI schema in JSON format.
+    """
+    return get_openapi(
+        title="GovLLMiner Authentication API",
+        version="1.0.0",
+        description="This is the OpenAPI schema for the authentication system.",
+        routes=app.routes,
+    )
+
 
 @router.post("/signup/", response_model=RegisterResponseModel)
-async def register_user(user: UserInDB, db: Session = Depends(get_db)):
+async def register_user(
+    user: UserInDB,
+    db: Session = Depends(get_db),
+):
     """
-        Register a new user.
-        If the email already exists, it will raise a 400 error.
-        If the registration is successful, it will return the user data.
+    Register a new user and send a verification email in the background.
     """
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    verification_token = str(uuid.uuid4()) 
+
     db_user = User(
         email=user.email,
         password=get_password_hash(user.password),
+        email_verified=False,
+        verification_token=verification_token
     )
 
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
+    print("Sending verification email", user.email, verification_token)
+    send_verification_email(user.email, verification_token)
+
     return {
-        "status": True,
-        "message": "User created successfully",
-        "data": {
-            "user": {
-                "email": db_user.email,
-                "id": str(db_user.id),
-                "email_verified": getattr(db_user, "email_verified", False),
-                "created_at": db_user.created_at.isoformat() if hasattr(db_user, "created_at") else None,
-                "updated_at": db_user.updated_at.isoformat() if hasattr(db_user, "updated_at") else None
-            }
+            "status": True,
+            "message": "User created successfully, check your email for verification",
+            "data": {
+                "user": {
+                    "id": str(db_user.id),
+                    "email": db_user.email,
+                    "email_verified": getattr(db_user, "email_verified"),
+                }
+            },
         }
-    }
 
 
 
-@router.post("/signin", response_model=LoginResponseModel)
+@router.get("/verify-email/", include_in_schema=False)
+async def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.verification_token == token).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user.email_verified = True
+    user.verification_token = None 
+    db.commit()
+
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+
+    return {
+            "status": True,
+            "message": "User created successfully",
+            "data": {
+                "user": {
+                    "email": user.email,
+                    "id": str(user.id),
+                    "email_verified": getattr(user, "email_verified"),
+                    "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
+                    "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                }
+            },
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
+
+
+@router.post("/signin/", response_model=LoginResponseModel)
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
 ):
@@ -104,6 +148,12 @@ async def login_for_access_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not not_verified_user(db, form_data.email):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email not verified, Please verify your email to continue",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -178,9 +228,11 @@ async def auth(code: str, request: Request):
             "name": id_info.get('name'),
             "picture": id_info.get('picture'),
             "email_verified": id_info.get('email_verified'),
+            "verification_token": str(uuid.uuid4())
         }
 
         request.session["user_data"] = payload 
+        print("The payload is", payload)
         return RedirectResponse(url=request.url_for('token'))
 
     except ValueError as e:
@@ -205,31 +257,43 @@ async def token(request: Request):
         user =  authenticate_google_user(db, user_data["email"])
         if user:
             print("Following the path of existing user")
+            access_token_expires = timedelta(minutes=30)
+            access_token = create_access_token(
+                data={"sub": user_data["email"]}, expires_delta=access_token_expires
+            )
+            response_data = {
+                "status": True,
+                "message": "User login successful",
+                "data": {
+                    "user": {
+                        "email": user.email,
+                        "id": str(user.id),
+                        "email_verified": getattr(user, "email_verified"),
+                        "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
+                        "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                    },
+                    "access_token": access_token,
+                    "token_type": "bearer"
+                }
+            }
+            return LoginResponseModel(**response_data)
         else:
             print("Following the path of new user")
-            add_google_user(db, user_data["email"])
-            user =  authenticate_google_user(db, user_data["email"])
-        
-        access_token_expires = timedelta(minutes=30)
-        access_token = create_access_token(
-            data={"sub": user_data["email"]}, expires_delta=access_token_expires
-        )
-        response_data = {
-            "status": True,
-            "message": "User login successful",
-            "data": {
-                "user": {
-                    "email": user.email,
-                    "id": str(user.id),
-                    "email_verified": getattr(user, "email_verified", False),
-                    "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-                    "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+            add_google_user(db, user_data)
+            print("Sending verification email", user_data["email"], user_data["verification_token"])
+            send_verification_email(user_data["email"], user_data["verification_token"])
+            reponnse = {
+                "status": True,
+                "message": "User created successfully, check your email for verification",
+                "data": {
+                    "user": {
+                        "id": str(user_data["sub"]),
+                        "email": user_data["email"],
+                        "email_verified": getattr(user_data, "email_verified", False),
+                    }
                 },
-                "access_token": access_token,
-                "token_type": "bearer"
             }
-            }
-        return LoginResponseModel(**response_data)
+            return RegisterResponseModel(**reponnse)
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
@@ -239,4 +303,4 @@ async def read_users_me(current_user: UserInDB = Depends(get_current_active_user
     return current_user
 
 
-app.include_router(router, prefix="/api/authentication", tags=["auth"])
+app.include_router(router, prefix="/auth", tags=["auth"])

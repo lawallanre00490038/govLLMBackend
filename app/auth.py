@@ -41,6 +41,12 @@ def authenticate_user(db: Session, email: str, password: str):
         return None
     return user
 
+def not_verified_user(db: Session, email: str):
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.email_verified:
+        return True
+    return False
+
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
@@ -78,8 +84,11 @@ def authenticate_google_user(db: Session, email: str):
     if not user:
         return None
     return user
-def add_google_user(db: Session, email: str):
-    user = User(email=email)
+def add_google_user(db: Session, user_data: dict):
+    user = User(
+        email=user_data["email"],
+        verification_token=user_data["verification_token"],
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
