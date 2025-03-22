@@ -274,7 +274,7 @@ async def read_users_me(current_user: UserInDB = Depends(get_current_active_user
     return current_user
 
 # delete account
-@router.delete("/users/me/")
+@router.delete("/users/delete_me/")
 async def delete_user(current_user: UserInDB = Depends(get_current_active_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == current_user.email).first()
     db.delete(user)
