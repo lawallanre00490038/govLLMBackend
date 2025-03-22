@@ -29,7 +29,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the GovLLMiner Authentication API."}
+    return {"message": "Welcome to the GovLLMiner API."}
 
 
 @app.get("/openapi.json", include_in_schema=False)
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     HOST = "0.0.0.0" if ENV == "production" else "localhost"
     uvicorn.run(
         app="main:app", 
-        host="localhost", 
+        host="0.0.0.0", 
         port=PORT, 
         reload=True,
     )
