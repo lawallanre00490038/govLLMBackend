@@ -2,8 +2,8 @@ from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime, timezone
-from .database import Base
-from .config import BREVO_API_KEY, FRONTEND_URL
+from app.database import Base
+from app.configs.config import BREVO_API_KEY, FRONTEND_URL
 
 class User(Base):
     __tablename__ = "users"

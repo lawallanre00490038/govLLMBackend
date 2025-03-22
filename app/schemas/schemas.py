@@ -33,7 +33,9 @@ class LoginRequestModel(BaseModel):
 class LoginResponseModel(BaseModel):
     status: bool = True
     message: str = "User login successful"
-    data: dict
+    data: dict | list | str | int | float | bool | None = None
+    access_token: str | None = None
+    token_type: str | None = None
 
     class Config:
         from_attributes = True

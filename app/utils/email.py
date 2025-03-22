@@ -1,8 +1,9 @@
 from __future__ import print_function
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
-from .config import BREVO_API_KEY, EMAIL_FROM, BACKEND_URL
+from app.configs.config import BREVO_API_KEY, EMAIL_FROM, BACKEND_URL, FRONTEND_URL
 from pprint import pprint
+from typing import Optional
 
 def send_verification_email(to_email: str, verification_token: str):
     configuration = sib_api_v3_sdk.Configuration()
@@ -10,7 +11,7 @@ def send_verification_email(to_email: str, verification_token: str):
 
     api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
-    verification_link = f"{BACKEND_URL}/auth/verify-email?token={verification_token}"
+    verification_link = f"{FRONTEND_URL}/auth/verify-email?token={verification_token}"
 
     sender = {"name": "GovLLMiner", "email": EMAIL_FROM}
     to = [{"email": to_email}]

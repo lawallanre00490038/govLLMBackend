@@ -1,65 +1,30 @@
-from fastapi import APIRouter, FastAPI, Depends, HTTPException, status, Query
-from fastapi.staticfiles import StaticFiles
-from fastapi.openapi.utils import get_openapi
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import RedirectResponse
 import httpx
 import uuid
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from starlette.requests import Request
-from starlette.middleware.sessions import SessionMiddleware
-from authlib.integrations.starlette_client import OAuth, OAuthError
-from .config import CLIENT_ID, CLIENT_SECRET, SECRET_KEY
+from authlib.integrations.starlette_client import OAuth
+from app.configs.config import CLIENT_ID, CLIENT_SECRET
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from .database import engine, Base, get_db, SessionLocal
-from .models import User
-from fastapi.middleware.cors import CORSMiddleware
-from .schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel, GooglePayload
-from .auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
-from .email import send_verification_email
+from app.database import engine, Base, get_db, SessionLocal
+from app.models.user import User
+from app.schemas.schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel, GooglePayload
+from app.utils.auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
+from app.utils.email import send_verification_email
 from dotenv import load_dotenv
 
 Base.metadata.create_all(bind=engine)
 load_dotenv()
 
-app = FastAPI()
 router = APIRouter()
-
-
 oauth = OAuth()
 
-# Allow requests from your frontend
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://govllmbackend.onrender.com"
-]
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], 
-    allow_headers=["*"], 
-)
 
 
-
-@app.get("/openapi.json", include_in_schema=False)
-async def get_openapi_schema():
-    """
-    Returns the OpenAPI schema in JSON format.
-    """
-    return get_openapi(
-        title="GovLLMiner Authentication API",
-        version="1.0.0",
-        description="This is the OpenAPI schema for the authentication system.",
-        routes=app.routes,
-    )
-
-
-@router.post("/signup/", response_model=RegisterResponseModel)
+@router.post("/signup", response_model=RegisterResponseModel)
 async def register_user(
     user: UserInDB,
     db: Session = Depends(get_db),
@@ -87,7 +52,7 @@ async def register_user(
     print("Sending verification email", user.email, verification_token)
     send_verification_email(user.email, verification_token)
 
-    return {
+    response = {
             "status": True,
             "message": "User created successfully, check your email for verification",
             "data": {
@@ -98,11 +63,13 @@ async def register_user(
                 }
             },
         }
+    print("The response before the verification is:", response)
+    return RegisterResponseModel(**response)
 
 
 
-@router.get("/verify-email/", include_in_schema=False)
-async def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
+@router.get("/verify-email", include_in_schema=False)
+async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
     user = db.query(User).filter(User.verification_token == token).first()
     
     if not user:
@@ -116,8 +83,7 @@ async def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-
-    return {
+    response = {
             "status": True,
             "message": "User created successfully",
             "data": {
@@ -132,9 +98,10 @@ async def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
             "access_token": access_token,
             "token_type": "bearer"
         }
+    return LoginResponseModel(**response)
 
 
-@router.post("/signin/", response_model=LoginResponseModel)
+@router.post("/signin", response_model=LoginResponseModel)
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
 ):
@@ -185,7 +152,9 @@ async def login_for_access_token(
 async def google_login(request: Request):
     """
         Redirect the user to Google login page.
+        if authenticated, return success else raise a 400 error.
     """
+    print("The request is", request.headers.get("Referer"))
     redirect_uri = request.url_for('auth')
     google_auth_url = f"https://accounts.google.com/o/oauth2/auth?client_id={CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=openid email profile"
 
@@ -227,13 +196,14 @@ async def auth(code: str, request: Request):
             "email": id_info.get('email'),
             "name": id_info.get('name'),
             "picture": id_info.get('picture'),
-            "is_email_verified": id_info.get('is_email_verified'),
+            "is_email_verified": id_info.get('email_verified'),
             "verification_token": str(uuid.uuid4())
         }
 
         request.session["user_data"] = payload 
         print("The payload is", payload)
-        return RedirectResponse(url=request.url_for('token'))
+        response = validate(request)
+        return response
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid id_token: {str(e)}")
@@ -242,25 +212,82 @@ async def auth(code: str, request: Request):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-@router.get("/token", include_in_schema=False)
-async def token(request: Request):
-    """
-        Handle the Google login callback.
-        If the login is successful, it will return the user data and access token.
-        If the login is not successful, it will raise a 400 error.
-    """
+# @router.get("/token", include_in_schema=False)
+# async def token(request: Request):
+#     """
+#         Handle the Google login callback.
+#         If the login is successful, it will return the user data and access token.
+#         If the login is not successful, it will raise a 400 error.
+#     """
+#     user_data = request.session.get('user_data')
+#     db = SessionLocal()
+#     if not user_data:
+#         raise HTTPException(status_code=401, detail="User not authenticated")
+#     try:
+#         user =  authenticate_google_user(db, user_data["email"])
+#         access_token_expires = timedelta(minutes=30)
+#         access_token = create_access_token(
+#             data={"sub": user_data["email"]}, expires_delta=access_token_expires
+#         )
+#         if user:
+#             print("Following the path of existing user")
+#             response_data = {
+#                 "status": True,
+#                 "message": "User login successful",
+#                 "data": {
+#                     "user": {
+#                         "email": user.email,
+#                         "id": str(user.id),
+#                         "is_email_verified": user.is_email_verified,
+#                         "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
+#                         "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+#                     },
+#                     "access_token": access_token,
+#                     "token_type": "bearer"
+#                 }
+#             }
+#             return LoginResponseModel(**response_data)
+#         else:
+#             print("Following the path of new user")
+#             add_google_user(db, user_data)
+#             reponnse = {
+#                 "status": True,
+#                 "message": "User created successfully and verified,",
+#                 "data": {
+#                     "user": {
+#                         "id": str(user_data["sub"]),
+#                         "email": user_data["email"],
+#                         "is_email_verified": user_data["is_email_verified"],
+#                     },
+#                     "access_token": access_token,
+#                     "token_type": "bearer"
+#                 },
+#             }
+#             return LoginResponseModel(**reponnse)
+            
+#     except Exception as e:
+#         print("The error is", e)
+#         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@router.get("/users/me/")
+async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
+    return current_user
+
+
+
+def validate(request: Request):
     user_data = request.session.get('user_data')
     db = SessionLocal()
     if not user_data:
         raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         user =  authenticate_google_user(db, user_data["email"])
+        access_token_expires = timedelta(minutes=30)
+        access_token = create_access_token(
+            data={"sub": user_data["email"]}, expires_delta=access_token_expires
+        )
         if user:
             print("Following the path of existing user")
-            access_token_expires = timedelta(minutes=30)
-            access_token = create_access_token(
-                data={"sub": user_data["email"]}, expires_delta=access_token_expires
-            )
             response_data = {
                 "status": True,
                 "message": "User login successful",
@@ -268,7 +295,7 @@ async def token(request: Request):
                     "user": {
                         "email": user.email,
                         "id": str(user.id),
-                        "is_email_verified": getattr(user, "is_email_verified"),
+                        "is_email_verified": user.is_email_verified,
                         "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
                         "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
                     },
@@ -280,27 +307,20 @@ async def token(request: Request):
         else:
             print("Following the path of new user")
             add_google_user(db, user_data)
-            print("Sending verification email", user_data["email"], user_data["verification_token"])
-            send_verification_email(user_data["email"], user_data["verification_token"])
             reponnse = {
                 "status": True,
-                "message": "User created successfully, check your email for verification",
+                "message": "User created successfully and verified,",
                 "data": {
                     "user": {
                         "id": str(user_data["sub"]),
                         "email": user_data["email"],
-                        "is_email_verified": getattr(user_data, "is_email_verified", False),
-                    }
+                        "is_email_verified": user_data["is_email_verified"],
+                    },
+                    "access_token": access_token,
+                    "token_type": "bearer"
                 },
             }
             return RegisterResponseModel(**reponnse)
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-@app.get("/users/me/")
-async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
-    return current_user
-
-
-app.include_router(router, prefix="/auth", tags=["auth"])

@@ -7,10 +7,10 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from jwt.exceptions import InvalidTokenError
 
-from .database import SessionLocal
-from .models import User
-from .schemas import UserInDB, TokenData
-from .config import SECRET_KEY
+from app.database import SessionLocal
+from app.models.user import User
+from app.schemas.schemas import UserInDB, TokenData
+from app.configs.config import SECRET_KEY
 
 
 ALGORITHM = "HS256"
@@ -49,7 +49,7 @@ def not_verified_user(db: Session, email: str):
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=35))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -88,6 +88,7 @@ def add_google_user(db: Session, user_data: dict):
     user = User(
         email=user_data["email"],
         verification_token=user_data["verification_token"],
+        is_email_verified=user_data["is_email_verified"],
     )
     db.add(user)
     db.commit()
