@@ -26,6 +26,9 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the GovLLMiner Authentication API."}
 
 
 @app.get("/openapi.json", include_in_schema=False)
