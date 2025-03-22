@@ -16,6 +16,7 @@ origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://govllmbackend.onrender.com"
+    "*"
 ]
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.add_middleware(
