@@ -11,7 +11,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.database import engine, Base, get_db, SessionLocal
 from app.models.user import User
-from app.schemas.schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel, GooglePayload
+from app.schemas.schemas import  UserInDB, LoginResponseModel, GetTokenResponse, RegisterResponseModel, LoginRequestModel, GooglePayload, GetTokenRequest
 from app.utils.auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
 from app.utils.email import send_verification_email
 from dotenv import load_dotenv
@@ -24,7 +24,7 @@ oauth = OAuth()
 
 
 
-@router.post("/signup", response_model=RegisterResponseModel)
+@router.post("/signup/", response_model=RegisterResponseModel)
 async def register_user(
     user: UserInDB,
     db: Session = Depends(get_db),
@@ -49,7 +49,8 @@ async def register_user(
     db.commit()
     db.refresh(db_user)
 
-    print("Sending verification email", user.email, verification_token)
+    print(f"Generated Token for {db_user.email}: {verification_token}")
+    print(f"Stored Token in DB: {db_user.verification_token}")
     send_verification_email(user.email, verification_token)
 
     response = {
@@ -59,9 +60,9 @@ async def register_user(
                 "user": {
                     "id": str(db_user.id),
                     "email": db_user.email,
-                    "is_email_verified": getattr(db_user, "is_email_verified"),
-                    "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-                    "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                    "is_email_verified": db_user.is_email_verified,
+                    "created_at": db_user.created_at.isoformat(),
+                    "updated_at": db_user.updated_at.isoformat()
                 }
             },
         }
@@ -70,8 +71,9 @@ async def register_user(
 
 
 
-@router.get("/verify-email", include_in_schema=True)
+@router.get("/verify-email/", include_in_schema=True)
 async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
+    print("The token is", token)
     user = db.query(User).filter(User.verification_token == token).first()
     
     if not user:
@@ -92,9 +94,9 @@ async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
                 "user": {
                     "email": user.email,
                     "id": str(user.id),
-                    "is_email_verified": getattr(user, "is_email_verified"),
-                    "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-                    "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                    "is_email_verified": user.is_email_verified,
+                    "created_at": user.created_at.isoformat(),
+                    "updated_at": user.updated_at.isoformat()
                 }
             },
             "access_token": access_token,
@@ -103,7 +105,7 @@ async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
     return LoginResponseModel(**response)
 
 
-@router.post("/signin", response_model=LoginResponseModel)
+@router.post("/signin/", response_model=LoginResponseModel)
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
 ):
@@ -119,7 +121,7 @@ async def login_for_access_token(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not not_verified_user(db, form_data.email):
+    if not_verified_user(db, form_data.email):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email not verified, Please verify your email to continue",
@@ -138,9 +140,9 @@ async def login_for_access_token(
             "user": {
                 "email": user.email,
                 "id": str(user.id),
-                "is_email_verified": getattr(user, "is_email_verified", False),
-                "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-                "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                "is_email_verified": user.is_email_verified,
+                "created_at": user.created_at.isoformat(),
+                "updated_at": user.updated_at.isoformat()
             },
         },
         "access_token": access_token,
@@ -150,7 +152,7 @@ async def login_for_access_token(
 
 
 
-@router.get("/signin/google")
+@router.get("/signin/google/")
 async def google_login(request: Request):
     """
         Redirect the user to Google login page.
@@ -214,62 +216,6 @@ async def auth(code: str, request: Request):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-# @router.get("/token", include_in_schema=False)
-# async def token(request: Request):
-#     """
-#         Handle the Google login callback.
-#         If the login is successful, it will return the user data and access token.
-#         If the login is not successful, it will raise a 400 error.
-#     """
-#     user_data = request.session.get('user_data')
-#     db = SessionLocal()
-#     if not user_data:
-#         raise HTTPException(status_code=401, detail="User not authenticated")
-#     try:
-#         user =  authenticate_google_user(db, user_data["email"])
-#         access_token_expires = timedelta(minutes=30)
-#         access_token = create_access_token(
-#             data={"sub": user_data["email"]}, expires_delta=access_token_expires
-#         )
-#         if user:
-#             print("Following the path of existing user")
-#             response_data = {
-#                 "status": True,
-#                 "message": "User login successful",
-#                 "data": {
-#                     "user": {
-#                         "email": user.email,
-#                         "id": str(user.id),
-#                         "is_email_verified": user.is_email_verified,
-#                         "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-#                         "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
-#                     },
-#                     "access_token": access_token,
-#                     "token_type": "bearer"
-#                 }
-#             }
-#             return LoginResponseModel(**response_data)
-#         else:
-#             print("Following the path of new user")
-#             add_google_user(db, user_data)
-#             reponnse = {
-#                 "status": True,
-#                 "message": "User created successfully and verified,",
-#                 "data": {
-#                     "user": {
-#                         "id": str(user_data["sub"]),
-#                         "email": user_data["email"],
-#                         "is_email_verified": user_data["is_email_verified"],
-#                     },
-#                     "access_token": access_token,
-#                     "token_type": "bearer"
-#                 },
-#             }
-#             return LoginResponseModel(**reponnse)
-            
-#     except Exception as e:
-#         print("The error is", e)
-#         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @router.get("/users/me/")
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
@@ -282,6 +228,38 @@ async def delete_user(current_user: UserInDB = Depends(get_current_active_user),
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully"}
+
+
+@router.get("/users/generate_token_to_verify_email/", response_model=GetTokenResponse)
+async def get_token_to_verify_email(
+    form_data: GetTokenRequest, 
+    db: Session = Depends(get_db)
+):
+    existing_user = db.query(User).filter(User.email == form_data.email).first()
+    if not existing_user:
+        raise HTTPException(status_code=400, detail="Email not registered. Please signup")
+
+    verification_token = str(uuid.uuid4()) 
+
+    print(f"Generated Token for {existing_user.email}: {verification_token}")
+    print(f"Stored Token in DB: {existing_user.verification_token}")
+    send_verification_email(existing_user.email, verification_token)
+
+    response = {
+            "status": True,
+            "message": "Token created successfully, check your email for verification",
+            "data": {
+                "user": {
+                    "id": str(existing_user.id),
+                    "email": existing_user.email,
+                    "is_email_verified": existing_user.is_email_verified,
+                    "created_at": existing_user.created_at.isoformat(),
+                    "updated_at": existing_user.updated_at.isoformat()
+                }
+            },
+        }
+    print("The response before the verification is:", response)
+    return RegisterResponseModel(**response)
 
 
 
@@ -306,8 +284,8 @@ def validate(request: Request):
                         "email": user.email,
                         "id": str(user.id),
                         "is_email_verified": user.is_email_verified,
-                        "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-                        "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                        "created_at": user.created_at.isoformat(),
+                        "updated_at": user.updated_at.isoformat()
                     },
                 },
                 "access_token": access_token,
@@ -324,9 +302,9 @@ def validate(request: Request):
                     "user": {
                         "id": str(user_data["sub"]),
                         "email": user_data["email"],
-                        "is_email_verified": user_data["is_email_verified"],
-                        "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
-                        "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
+                        "is_email_verified": user.is_email_verified,
+                        "created_at": user.created_at.isoformat(),
+                        "updated_at": user.updated_at.isoformat()
                     },
                 },
                 "access_token": access_token,

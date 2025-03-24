@@ -43,7 +43,7 @@ def authenticate_user(db: Session, email: str, password: str):
 
 def not_verified_user(db: Session, email: str):
     user = db.query(User).filter(User.email == email).first()
-    if not user or not user.is_email_verified:
+    if not user.is_email_verified:
         return True
     return False
 

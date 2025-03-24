@@ -54,6 +54,7 @@ class RegisterResponseModel(BaseModel):
     class Config:
         from_attributes = True
 
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -67,3 +68,12 @@ class GooglePayload(BaseModel):
     name: str
     picture: str
     is_email_verified: bool
+
+
+class GetTokenRequest(BaseModel):
+    email: str
+    
+class GetTokenResponse(BaseModel):
+    status: bool
+    message: str
+    data: TokenData

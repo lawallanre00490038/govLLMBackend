@@ -45,18 +45,13 @@ async def get_openapi_schema():
     )
 
 
-# Print all registered routes
-for route in app.routes:
-    print(route.name, route.path)
-
-
 if __name__ == "__main__":
     ENV = os.getenv("ENV", "development")
     PORT = int(os.getenv("PORT", 10000))  # Render expects port 10000
     HOST = "0.0.0.0" if ENV == "production" else "localhost"
     uvicorn.run(
         app="main:app", 
-        host="0.0.0.0", 
+        host="localhost", 
         port=PORT, 
         reload=True,
     )
