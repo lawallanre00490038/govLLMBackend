@@ -51,7 +51,7 @@ if __name__ == "__main__":
     HOST = "0.0.0.0" if ENV == "production" else "localhost"
     uvicorn.run(
         app="main:app", 
-        host="localhost", 
+        host="0.0.0.0", 
         port=PORT, 
         reload=True,
     )
