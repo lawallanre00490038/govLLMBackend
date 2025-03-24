@@ -60,6 +60,8 @@ async def register_user(
                     "id": str(db_user.id),
                     "email": db_user.email,
                     "is_email_verified": getattr(db_user, "is_email_verified"),
+                    "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
+                    "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
                 }
             },
         }
@@ -140,9 +142,9 @@ async def login_for_access_token(
                 "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
                 "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
             },
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
+        },
+        "access_token": access_token,
+        "token_type": "bearer"
     }
     return LoginResponseModel(**response_data)
 
@@ -307,9 +309,9 @@ def validate(request: Request):
                         "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
                         "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
                     },
-                    "access_token": access_token,
-                    "token_type": "bearer"
-                }
+                },
+                "access_token": access_token,
+                "token_type": "bearer"
             }
             return LoginResponseModel(**response_data)
         else:
@@ -323,12 +325,14 @@ def validate(request: Request):
                         "id": str(user_data["sub"]),
                         "email": user_data["email"],
                         "is_email_verified": user_data["is_email_verified"],
+                        "created_at": user.created_at.isoformat() if hasattr(user, "created_at") else None,
+                        "updated_at": user.updated_at.isoformat() if hasattr(user, "updated_at") else None
                     },
-                    "access_token": access_token,
-                    "token_type": "bearer"
                 },
+                "access_token": access_token,
+                "token_type": "bearer"
             }
-            return RegisterResponseModel(**reponnse)
+            return LoginResponseModel(**reponnse)
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")

@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, Any
 from datetime import datetime
 from uuid import UUID
+from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 
 class UserBase(BaseModel):
@@ -25,17 +27,20 @@ class UserModel(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-
 class LoginRequestModel(BaseModel):
     email: str
     password: str
 
+
+class DataModel(BaseModel):
+    user: UserModel
+
 class LoginResponseModel(BaseModel):
-    status: bool = True
-    message: str = "User login successful"
-    data: dict | list | str | int | float | bool | None = None
-    access_token: str | None = None
-    token_type: str | None = None
+    status: bool
+    message: str
+    data: DataModel
+    access_token: str
+    token_type: str = "bearer"
 
     class Config:
         from_attributes = True
@@ -43,7 +48,8 @@ class LoginResponseModel(BaseModel):
 class RegisterResponseModel(BaseModel):
     status: bool = True
     message: str = "Request successful"
-    data: dict | list | str | int | float | bool | None = None
+    data: DataModel
+    
 
     class Config:
         from_attributes = True
