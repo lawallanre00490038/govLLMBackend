@@ -68,7 +68,7 @@ async def register_user(
 
 
 
-@router.get("/verify-email", include_in_schema=False)
+@router.get("/verify-email", include_in_schema=True)
 async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
     user = db.query(User).filter(User.verification_token == token).first()
     
