@@ -230,16 +230,23 @@ async def delete_user(current_user: UserInDB = Depends(get_current_active_user),
     return {"message": "User deleted successfully"}
 
 
-@router.get("/users/generate_token_to_verify_email/", response_model=GetTokenResponse)
-async def get_token_to_verify_email(
-    form_data: GetTokenRequest, 
-    db: Session = Depends(get_db)
-):
-    existing_user = db.query(User).filter(User.email == form_data.email).first()
+@router.post("/users/generate_token_to_verify_email/", response_model=RegisterResponseModel, include_in_schema=True)
+async def get_token_to_verify_email( form_data: GetTokenRequest):
+    """
+        If a users email is not verified, generate a token and send a verification email.
+        This is only used when a user tries to login with an email and their email has not been verified.
+    """
+    db = SessionLocal()
+    existing_user = authenticate_google_user(db, form_data.email)
+    if not not_verified_user(db, form_data.email):
+        raise HTTPException(status_code=400, detail="Email already verified. Please signin")
     if not existing_user:
         raise HTTPException(status_code=400, detail="Email not registered. Please signup")
 
     verification_token = str(uuid.uuid4()) 
+    existing_user.verification_token = verification_token
+    db.commit()
+
 
     print(f"Generated Token for {existing_user.email}: {verification_token}")
     print(f"Stored Token in DB: {existing_user.verification_token}")
