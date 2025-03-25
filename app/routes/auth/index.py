@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 import httpx
 import uuid
 from sqlalchemy.orm import Session
+from fastapi import Response
 from datetime import timedelta
 from starlette.requests import Request
 from authlib.integrations.starlette_client import OAuth
@@ -10,17 +11,24 @@ from app.configs.config import CLIENT_ID, CLIENT_SECRET
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.database import engine, Base, get_db, SessionLocal
+from fastapi.responses import HTMLResponse
 from app.models.user import User
 from app.schemas.schemas import  UserInDB, LoginResponseModel, GetTokenResponse, RegisterResponseModel, LoginRequestModel, GooglePayload, GetTokenRequest
 from app.utils.auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
 from app.utils.email import send_verification_email
 from dotenv import load_dotenv
+from fastapi.responses import JSONResponse
 
 Base.metadata.create_all(bind=engine)
 load_dotenv()
 
 router = APIRouter()
 oauth = OAuth()
+import os
+
+# Detect if running in development mode
+IS_DEV = os.getenv("ENV", "development") == "development"
+print("Running in development mode:", IS_DEV)
 
 
 
@@ -87,22 +95,24 @@ async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    response = {
-            "status": True,
-            "message": "User created successfully",
-            "data": {
-                "user": {
-                    "email": user.email,
-                    "id": str(user.id),
-                    "is_email_verified": user.is_email_verified,
-                    "created_at": user.created_at.isoformat(),
-                    "updated_at": user.updated_at.isoformat()
-                }
-            },
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-    return LoginResponseModel(**response)
+    # response = {
+    #         "status": True,
+    #         "message": "User created successfully",
+    #         "data": {
+    #             "user": {
+    #                 "email": user.email,
+    #                 "id": str(user.id),
+    #                 "is_email_verified": user.is_email_verified,
+    #                 "created_at": user.created_at.isoformat(),
+    #                 "updated_at": user.updated_at.isoformat()
+    #             }
+    #         },
+    #         "access_token": access_token,
+    #         "token_type": "bearer"
+    #     }
+    # return LoginResponseModel(**response)
+    response_function = response_funct(user, access_token)
+    return response_function
 
 
 @router.post("/signin/", response_model=LoginResponseModel)
@@ -133,22 +143,24 @@ async def login_for_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
 
-    response_data = {
-        "status": True,
-        "message": "User login successful",
-        "data": {
-            "user": {
-                "email": user.email,
-                "id": str(user.id),
-                "is_email_verified": user.is_email_verified,
-                "created_at": user.created_at.isoformat(),
-                "updated_at": user.updated_at.isoformat()
-            },
-        },
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
-    return LoginResponseModel(**response_data)
+    # response_data = {
+    #     "status": True,
+    #     "message": "User login successful",
+    #     "data": {
+    #         "user": {
+    #             "email": user.email,
+    #             "id": str(user.id),
+    #             "is_email_verified": user.is_email_verified,
+    #             "created_at": user.created_at.isoformat(),
+    #             "updated_at": user.updated_at.isoformat()
+    #         },
+    #     },
+    #     "access_token": access_token,
+    #     "token_type": "bearer"
+    # }
+    # return LoginResponseModel(**response_data)
+    response_function = response_funct(user, access_token)
+    return response_function
 
 
 
@@ -167,8 +179,10 @@ async def google_login(request: Request):
 @router.get("/auth", include_in_schema=False)
 async def auth(code: str, request: Request):
     """
-        Handle the Google login callback.
+        This routes is automatically called by the google route
+        Handle the Google sign/signup callback.
         Responsible for exchanging the code for an access token and validating the token.
+        Send the user data to the user.
     """
     token_request_uri = "https://oauth2.googleapis.com/token"
     data = {
@@ -217,6 +231,8 @@ async def auth(code: str, request: Request):
 
 
 
+
+
 @router.get("/users/me/")
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
     return current_user
@@ -238,11 +254,11 @@ async def get_token_to_verify_email( form_data: GetTokenRequest):
     """
     db = SessionLocal()
     existing_user = authenticate_google_user(db, form_data.email)
-    if not not_verified_user(db, form_data.email):
-        raise HTTPException(status_code=400, detail="Email already verified. Please signin")
     if not existing_user:
         raise HTTPException(status_code=400, detail="Email not registered. Please signup")
-
+    if not not_verified_user(db, form_data.email):
+        raise HTTPException(status_code=400, detail="Email already verified. Please signin")
+    
     verification_token = str(uuid.uuid4()) 
     existing_user.verification_token = verification_token
     db.commit()
@@ -283,41 +299,83 @@ def validate(request: Request):
         )
         if user:
             print("Following the path of existing user")
-            response_data = {
-                "status": True,
-                "message": "User login successful",
-                "data": {
-                    "user": {
-                        "email": user.email,
-                        "id": str(user.id),
-                        "is_email_verified": user.is_email_verified,
-                        "created_at": user.created_at.isoformat(),
-                        "updated_at": user.updated_at.isoformat()
-                    },
-                },
-                "access_token": access_token,
-                "token_type": "bearer"
-            }
-            return LoginResponseModel(**response_data)
+            # response_data = {
+            #     "status": True,
+            #     "message": "User login successful",
+            #     "data": {
+            #         "user": {
+            #             "email": user.email,
+            #             "id": str(user.id),
+            #             "is_email_verified": user.is_email_verified,
+            #             "created_at": user.created_at.isoformat(),
+            #             "updated_at": user.updated_at.isoformat()
+            #         },
+            #     },
+            #     "access_token": access_token,
+            #     "token_type": "bearer"
+            # }
+            # return LoginResponseModel(**response_data)
+            response_function = response_funct(user, access_token)
+            return response_function
         else:
             print("Following the path of new user")
             add_google_user(db, user_data)
-            reponnse = {
-                "status": True,
-                "message": "User created successfully and verified,",
-                "data": {
-                    "user": {
-                        "id": str(user_data["sub"]),
-                        "email": user_data["email"],
-                        "is_email_verified": user.is_email_verified,
-                        "created_at": user.created_at.isoformat(),
-                        "updated_at": user.updated_at.isoformat()
-                    },
-                },
-                "access_token": access_token,
-                "token_type": "bearer"
-            }
-            return LoginResponseModel(**reponnse)
+            # response = {
+            #     "status": True,
+            #     "message": "User created successfully and verified,",
+            #     "data": {
+            #         "user": {
+            #             "id": str(user_data["sub"]),
+            #             "email": user_data["email"],
+            #             "is_email_verified": user.is_email_verified,
+            #             "created_at": user.created_at.isoformat(),
+            #             "updated_at": user.updated_at.isoformat()
+            #         },
+            #     },
+            #     "access_token": access_token,
+            #     "token_type": "bearer"
+            # }
+            # return LoginResponseModel(**response)
+            response_function = response_funct(user, access_token)
+            return response_function
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+def response_funct(user, access_token):
+    response = JSONResponse(
+        content={
+            "status": True,
+            "message": "User login successful",
+            "data": {
+                "user": {
+                    "email": user.email,
+                    "id": str(user.id),
+                    "is_email_verified": user.is_email_verified,
+                    "created_at": user.created_at.isoformat(),
+                    "updated_at": user.updated_at.isoformat()
+                },
+            }
+        }
+    )
+
+    # ✅ Set secure HTTP-only cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=not IS_DEV,
+        samesite="Lax" if IS_DEV else "Strict",
+        max_age=1800
+    )
+
+    return response
+
+
+# key="access_token",
+# value=access_token,
+# httponly=True,  # Prevents JavaScript access
+# secure=True,  # Only send over HTTPS
+# samesite="Strict",  # Prevents CSRF
+# max_age=1800  # 30 minutes
