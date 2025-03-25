@@ -39,8 +39,8 @@ class LoginResponseModel(BaseModel):
     status: bool
     message: str
     data: DataModel
-    # access_token: str
-    # token_type: str = "bearer"
+    access_token: str
+    token_type: str = "bearer"
 
     class Config:
         from_attributes = True

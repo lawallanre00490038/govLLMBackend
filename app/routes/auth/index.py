@@ -299,45 +299,45 @@ def validate(request: Request):
         )
         if user:
             print("Following the path of existing user")
-            # response_data = {
-            #     "status": True,
-            #     "message": "User login successful",
-            #     "data": {
-            #         "user": {
-            #             "email": user.email,
-            #             "id": str(user.id),
-            #             "is_email_verified": user.is_email_verified,
-            #             "created_at": user.created_at.isoformat(),
-            #             "updated_at": user.updated_at.isoformat()
-            #         },
-            #     },
-            #     "access_token": access_token,
-            #     "token_type": "bearer"
-            # }
-            # return LoginResponseModel(**response_data)
-            response_function = response_funct(user, access_token)
-            return response_function
+            response_data = {
+                "status": True,
+                "message": "User login successful",
+                "data": {
+                    "user": {
+                        "email": user.email,
+                        "id": str(user.id),
+                        "is_email_verified": user.is_email_verified,
+                        "created_at": user.created_at.isoformat(),
+                        "updated_at": user.updated_at.isoformat()
+                    },
+                },
+                "access_token": access_token,
+                "token_type": "bearer"
+            }
+            return LoginResponseModel(**response_data)
+            # response_function = response_funct(user, access_token)
+            # return response_function
         else:
             print("Following the path of new user")
             add_google_user(db, user_data)
-            # response = {
-            #     "status": True,
-            #     "message": "User created successfully and verified,",
-            #     "data": {
-            #         "user": {
-            #             "id": str(user_data["sub"]),
-            #             "email": user_data["email"],
-            #             "is_email_verified": user.is_email_verified,
-            #             "created_at": user.created_at.isoformat(),
-            #             "updated_at": user.updated_at.isoformat()
-            #         },
-            #     },
-            #     "access_token": access_token,
-            #     "token_type": "bearer"
-            # }
+            response = {
+                "status": True,
+                "message": "User created successfully and verified,",
+                "data": {
+                    "user": {
+                        "id": str(user_data["sub"]),
+                        "email": user_data["email"],
+                        "is_email_verified": user.is_email_verified,
+                        "created_at": user.created_at.isoformat(),
+                        "updated_at": user.updated_at.isoformat()
+                    },
+                },
+                "access_token": access_token,
+                "token_type": "bearer"
+            }
             # return LoginResponseModel(**response)
-            response_function = response_funct(user, access_token)
-            return response_function
+            # response_function = response_funct(user, access_token)
+            # return response_function
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
