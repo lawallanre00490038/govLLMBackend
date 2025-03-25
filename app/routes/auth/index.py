@@ -95,24 +95,22 @@ async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    # response = {
-    #         "status": True,
-    #         "message": "User created successfully",
-    #         "data": {
-    #             "user": {
-    #                 "email": user.email,
-    #                 "id": str(user.id),
-    #                 "is_email_verified": user.is_email_verified,
-    #                 "created_at": user.created_at.isoformat(),
-    #                 "updated_at": user.updated_at.isoformat()
-    #             }
-    #         },
-    #         "access_token": access_token,
-    #         "token_type": "bearer"
-    #     }
-    # return LoginResponseModel(**response)
-    response_function = response_funct(user, access_token)
-    return response_function
+    response = {
+            "status": True,
+            "message": "User created successfully",
+            "data": {
+                "user": {
+                    "email": user.email,
+                    "id": str(user.id),
+                    "is_email_verified": user.is_email_verified,
+                    "created_at": user.created_at.isoformat(),
+                    "updated_at": user.updated_at.isoformat()
+                }
+            },
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
+    return LoginResponseModel(**response)
 
 
 @router.post("/signin/", response_model=LoginResponseModel)
@@ -143,24 +141,22 @@ async def login_for_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
 
-    # response_data = {
-    #     "status": True,
-    #     "message": "User login successful",
-    #     "data": {
-    #         "user": {
-    #             "email": user.email,
-    #             "id": str(user.id),
-    #             "is_email_verified": user.is_email_verified,
-    #             "created_at": user.created_at.isoformat(),
-    #             "updated_at": user.updated_at.isoformat()
-    #         },
-    #     },
-    #     "access_token": access_token,
-    #     "token_type": "bearer"
-    # }
-    # return LoginResponseModel(**response_data)
-    response_function = response_funct(user, access_token)
-    return response_function
+    response_data = {
+        "status": True,
+        "message": "User login successful",
+        "data": {
+            "user": {
+                "email": user.email,
+                "id": str(user.id),
+                "is_email_verified": user.is_email_verified,
+                "created_at": user.created_at.isoformat(),
+                "updated_at": user.updated_at.isoformat()
+            },
+        },
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+    return LoginResponseModel(**response_data)
 
 
 
@@ -315,8 +311,6 @@ def validate(request: Request):
                 "token_type": "bearer"
             }
             return LoginResponseModel(**response_data)
-            # response_function = response_funct(user, access_token)
-            # return response_function
         else:
             print("Following the path of new user")
             add_google_user(db, user_data)
@@ -335,42 +329,40 @@ def validate(request: Request):
                 "access_token": access_token,
                 "token_type": "bearer"
             }
-            # return LoginResponseModel(**response)
-            # response_function = response_funct(user, access_token)
-            # return response_function
+            return LoginResponseModel(**response)
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-def response_funct(user, access_token):
-    response = JSONResponse(
-        content={
-            "status": True,
-            "message": "User login successful",
-            "data": {
-                "user": {
-                    "email": user.email,
-                    "id": str(user.id),
-                    "is_email_verified": user.is_email_verified,
-                    "created_at": user.created_at.isoformat(),
-                    "updated_at": user.updated_at.isoformat()
-                },
-            }
-        }
-    )
+# def response_funct(user, access_token):
+#     response = JSONResponse(
+#         content={
+#             "status": True,
+#             "message": "User login successful",
+#             "data": {
+#                 "user": {
+#                     "email": user.email,
+#                     "id": str(user.id),
+#                     "is_email_verified": user.is_email_verified,
+#                     "created_at": user.created_at.isoformat(),
+#                     "updated_at": user.updated_at.isoformat()
+#                 },
+#             }
+#         }
+#     )
 
-    # ✅ Set secure HTTP-only cookie
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=not IS_DEV,
-        samesite="Lax" if IS_DEV else "Strict",
-        max_age=1800
-    )
+#     # ✅ Set secure HTTP-only cookie
+#     response.set_cookie(
+#         key="access_token",
+#         value=access_token,
+#         httponly=True,
+#         secure=not IS_DEV,
+#         samesite="Lax" if IS_DEV else "Strict",
+#         max_age=1800
+#     )
 
-    return response
+#     return response
 
 
 # key="access_token",
