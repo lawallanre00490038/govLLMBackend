@@ -164,7 +164,7 @@ async def google_login(request: Request):
 
     return RedirectResponse(url=google_auth_url)
 
-@router.get("/auth/", include_in_schema=False)
+@router.get("/auth", include_in_schema=False)
 async def auth(code: str, request: Request):
     """
         Handle the Google login callback.
