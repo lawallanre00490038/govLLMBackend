@@ -52,6 +52,15 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+def create_access_token(user: User, expires_delta: timedelta | None = None):
+    to_encode = {
+        "sub": user.email,
+        "id": str(user.id),
+        "is_email_verified": user.is_email_verified,
+        "exp": datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=35))
+    }
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

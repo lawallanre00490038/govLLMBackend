@@ -93,7 +93,7 @@ async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
 
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        user=user, expires_delta=access_token_expires
     )
     response = {
             "status": True,
@@ -138,7 +138,7 @@ async def login_for_access_token(
 
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        user=user, expires_delta=access_token_expires
     )
 
     response_data = {
@@ -292,7 +292,7 @@ async def validate(request: Request):
         print("The user from the validate function", user_data)
         access_token_expires = timedelta(minutes=30)
         access_token = create_access_token(
-            data={"sub": user_data["email"]}, expires_delta=access_token_expires
+            user=user, expires_delta=access_token_expires
         )
 
         if user:
@@ -336,3 +336,16 @@ async def validate(request: Request):
 # secure=True,  # Only send over HTTPS
 # samesite="Strict",  # Prevents CSRF
 # max_age=1800  # 30 minutes
+
+
+
+
+
+# Get redirect path from query params (default to home "/")
+# redirect_path = request.query_params.get("redirect", "/")
+
+# # Ensure the redirect path is safe
+# if not redirect_path.startswith("/"):
+#     raise HTTPException(status_code=400, detail="Invalid redirect path")
+
+# frontend_redirect_url = f"http://localhost:3000{redirect_path}"
