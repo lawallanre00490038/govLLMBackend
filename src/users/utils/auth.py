@@ -46,13 +46,11 @@ def not_verified_user(db: Session, email: str):
         return True
     return False
 
-# def create_access_token(data: dict, expires_delta: timedelta | None = None):
-#     to_encode = data.copy()
-#     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=35))
-#     to_encode.update({"exp": expire})
-#     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
 def create_access_token(user: User, expires_delta: timedelta | None = None):
+    print("Creating access token with data:", user)  # Debugging line
+    print("User ID:", user.id)  # Debugging line
+    print("User email:", user.email)  # Debugging line
+    print("User is_email_verified:", user.is_email_verified) 
     to_encode = {
         "sub": user.email,
         "id": str(user.id),
@@ -85,20 +83,21 @@ async def get_current_active_user(current_user: Annotated[UserInDB, Depends(get_
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
-
-# Google OAuth2 login and registration
 async def authenticate_google_user(db: Session, email: str):
     user = db.query(User).filter(User.email == email).first()
+    
     if not user:
         return None
     return user
 async def add_google_user(db: Session, user_data: dict):
-    user = User(
+    new_user = User(
         email=user_data["email"],
-        verification_token=user_data["verification_token"],
-        is_email_verified=user_data["is_email_verified"],
+        is_email_verified=user_data.get("is_email_verified", False),
+        verification_token=user_data.get("verification_token"),
     )
-    db.add(user)
+    db.add(new_user)
     db.commit()
-    db.refresh(user)
-    return user
+    db.refresh(new_user)
+    
+    print("User created successfully:", new_user)
+    return new_user

@@ -284,22 +284,27 @@ async def get_token_to_verify_email( form_data: GetTokenRequest):
 
 async def validate(request: Request):
     user_data = request.session.get('user_data')
+    print("The user data is", user_data)
     db = SessionLocal()
-    if not user_data:
+    if not user_data or "email" not in user_data:
         raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         user = await authenticate_google_user(db, user_data["email"]) 
-        print("The user from the validate function", user_data)
-        access_token_expires = timedelta(minutes=30)
-        access_token = create_access_token(
-            user=user, expires_delta=access_token_expires
-        )
-
+        print("The user from the validate function", user)
         if user:
             print("Following the path of existing user")
         else:
             print("Following the path of new user")
-            await add_google_user(db, user_data) 
+            user = await add_google_user(db, user_data) 
+
+        if not user:
+            raise HTTPException(status_code=500, detail="User creation failed")
+        
+        access_token_expires = timedelta(minutes=30)
+        print("The user going into the access token is ", user)
+        access_token = create_access_token(
+            user=user, expires_delta=access_token_expires
+        )
 
         frontend_redirect_url = f"http://localhost:3000"
         
@@ -313,7 +318,7 @@ async def validate(request: Request):
 
     except Exception as e:
         print("The error is", e)
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error, {e}")
 
 
 
