@@ -8,7 +8,7 @@ from fastapi.openapi.utils import get_openapi
 from src.users.routes import router as auth_router
 
 app = FastAPI()
-app.include_router(auth_router, prefix="/auth")
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 
 # Allow requests from your frontend
