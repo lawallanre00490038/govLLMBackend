@@ -6,11 +6,10 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from jwt.exceptions import InvalidTokenError
-
-from app.database import SessionLocal
-from app.models.user import User
-from app.schemas.schemas import UserInDB, TokenData
-from app.configs.config import SECRET_KEY
+from src.db.database import SessionLocal
+from src.models.user import User
+from src.users.schemas import TokenData, UserInDB
+from src.configs.config import SECRET_KEY
 
 
 ALGORITHM = "HS256"
@@ -79,12 +78,12 @@ async def get_current_active_user(current_user: Annotated[UserInDB, Depends(get_
 
 
 # Google OAuth2 login and registration
-def authenticate_google_user(db: Session, email: str):
+async def authenticate_google_user(db: Session, email: str):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return None
     return user
-def add_google_user(db: Session, user_data: dict):
+async def add_google_user(db: Session, user_data: dict):
     user = User(
         email=user_data["email"],
         verification_token=user_data["verification_token"],

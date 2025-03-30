@@ -3,9 +3,9 @@ import uvicorn
 import os
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from app.configs.config import SECRET_KEY
+from src.configs.config import SECRET_KEY
 from fastapi.openapi.utils import get_openapi
-from app.routes.auth.index import router as auth_router
+from src.users.routes import router as auth_router
 
 app = FastAPI()
 app.include_router(auth_router, prefix="/auth")

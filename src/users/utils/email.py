@@ -1,7 +1,7 @@
 from __future__ import print_function
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
-from app.configs.config import BREVO_API_KEY, EMAIL_FROM, BACKEND_URL, FRONTEND_URL
+from src.configs.config import BREVO_API_KEY, EMAIL_FROM, BACKEND_URL, FRONTEND_URL
 from pprint import pprint
 from typing import Optional
 

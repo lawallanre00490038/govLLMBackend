@@ -7,15 +7,15 @@ from fastapi import Response
 from datetime import timedelta
 from starlette.requests import Request
 from authlib.integrations.starlette_client import OAuth
-from app.configs.config import CLIENT_ID, CLIENT_SECRET
+from src.configs.config import CLIENT_ID, CLIENT_SECRET
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from app.database import engine, Base, get_db, SessionLocal
+from src.db.database import engine, Base, get_db, SessionLocal
 from fastapi.responses import HTMLResponse
-from app.models.user import User
-from app.schemas.schemas import  UserInDB, LoginResponseModel, GetTokenResponse, RegisterResponseModel, LoginRequestModel, GooglePayload, GetTokenRequest
-from app.utils.auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
-from app.utils.email import send_verification_email
+from src.models.user import User
+from .schemas import  UserInDB, LoginResponseModel, GetTokenResponse, RegisterResponseModel, LoginRequestModel, GooglePayload, GetTokenRequest
+from .utils.auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
+from .utils.email import send_verification_email
 from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 
@@ -216,7 +216,7 @@ async def auth(code: str, request: Request):
 
         request.session["user_data"] = payload 
         print("The payload is", payload)
-        response = validate(request)
+        response = await validate(request)
         return response
 
     except ValueError as e:
@@ -242,7 +242,7 @@ async def delete_user(current_user: UserInDB = Depends(get_current_active_user),
     return {"message": "User deleted successfully"}
 
 
-@router.post("/users/generate_token_to_verify_email/", response_model=RegisterResponseModel, include_in_schema=True)
+@router.post("/users/request-email-verification/", response_model=RegisterResponseModel, include_in_schema=True)
 async def get_token_to_verify_email( form_data: GetTokenRequest):
     """
         If a users email is not verified, generate a token and send a verification email.
@@ -282,75 +282,40 @@ async def get_token_to_verify_email( form_data: GetTokenRequest):
 
 
 
-def validate(request: Request):
+async def validate(request: Request):
     user_data = request.session.get('user_data')
     db = SessionLocal()
     if not user_data:
         raise HTTPException(status_code=401, detail="User not authenticated")
     try:
-        user =  authenticate_google_user(db, user_data["email"])
+        user = await authenticate_google_user(db, user_data["email"]) 
+        print("The user from the validate function", user_data)
         access_token_expires = timedelta(minutes=30)
         access_token = create_access_token(
             data={"sub": user_data["email"]}, expires_delta=access_token_expires
         )
+
         if user:
             print("Following the path of existing user")
-            response_data = {
-                "status": True,
-                "message": "User login successful",
-                "data": {
-                    "user": {
-                        "email": user.email,
-                        "id": str(user.id),
-                        "is_email_verified": user.is_email_verified,
-                        "created_at": user.created_at.isoformat(),
-                        "updated_at": user.updated_at.isoformat()
-                    },
-                },
-                "access_token": access_token,
-                "token_type": "bearer"
-            }
-            return LoginResponseModel(**response_data)
         else:
             print("Following the path of new user")
-            add_google_user(db, user_data)
-            response = {
-                "status": True,
-                "message": "User created successfully and verified,",
-                "data": {
-                    "user": {
-                        "id": str(user_data["sub"]),
-                        "email": user_data["email"],
-                        "is_email_verified": user.is_email_verified,
-                        "created_at": user.created_at.isoformat(),
-                        "updated_at": user.updated_at.isoformat()
-                    },
-                },
-                "access_token": access_token,
-                "token_type": "bearer"
-            }
-            return LoginResponseModel(**response)
+            await add_google_user(db, user_data) 
+
+        frontend_redirect_url = f"http://localhost:3000"
+        
+        return RedirectResponse(
+            url=frontend_redirect_url,
+            headers={
+                "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=1800",
+            },
+            status_code=302,
+        )
+
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-# def response_funct(user, access_token):
-#     response = JSONResponse(
-#         content={
-#             "status": True,
-#             "message": "User login successful",
-#             "data": {
-#                 "user": {
-#                     "email": user.email,
-#                     "id": str(user.id),
-#                     "is_email_verified": user.is_email_verified,
-#                     "created_at": user.created_at.isoformat(),
-#                     "updated_at": user.updated_at.isoformat()
-#                 },
-#             }
-#         }
-#     )
 
 #     # ✅ Set secure HTTP-only cookie
 #     response.set_cookie(
@@ -358,7 +323,7 @@ def validate(request: Request):
 #         value=access_token,
 #         httponly=True,
 #         secure=not IS_DEV,
-#         samesite="Lax" if IS_DEV else "Strict",
+#         samesite="Lax"
 #         max_age=1800
 #     )
 
