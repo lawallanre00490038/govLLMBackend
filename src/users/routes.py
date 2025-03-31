@@ -109,6 +109,9 @@ async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
     response = JSONResponse(
         content=jsonable_encoder(LoginResponseModel(**response)),
         status_code=status.HTTP_200_OK,
+        headers={
+            "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=1800",
+        },
     )
     response.set_cookie(
         key="access_token",
@@ -169,6 +172,9 @@ async def login_for_access_token(
     response = JSONResponse(
         content=jsonable_encoder(LoginResponseModel(**response_data)),
         status_code=status.HTTP_200_OK,
+        headers={
+            "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=1800",
+        },
     )
     response.set_cookie(
         key="access_token",
