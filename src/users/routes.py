@@ -1,9 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.responses import RedirectResponse
 import httpx
 import uuid
 from sqlalchemy.orm import Session
-from fastapi import Response
 from datetime import timedelta
 from starlette.requests import Request
 from authlib.integrations.starlette_client import OAuth
@@ -11,13 +9,13 @@ from src.configs.config import CLIENT_ID, CLIENT_SECRET
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from src.db.database import engine, Base, get_db, SessionLocal
-from fastapi.responses import HTMLResponse
 from src.models.user import User
-from .schemas import  UserInDB, LoginResponseModel, GetTokenResponse, RegisterResponseModel, LoginRequestModel, GooglePayload, GetTokenRequest
+from .schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel, GooglePayload, GetTokenRequest
 from .utils.auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
 from .utils.email import send_verification_email
 from dotenv import load_dotenv
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.encoders import jsonable_encoder
 
 Base.metadata.create_all(bind=engine)
 load_dotenv()
@@ -79,7 +77,7 @@ async def register_user(
 
 
 
-@router.post("/verify-email/", include_in_schema=True)
+@router.post("/verify-email/")
 async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
     print("The token is", token)
     user = db.query(User).filter(User.verification_token == token).first()
@@ -107,13 +105,26 @@ async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
                     "updated_at": user.updated_at.isoformat()
                 }
             },
-            "access_token": access_token,
-            "token_type": "bearer"
         }
-    return LoginResponseModel(**response)
+    response = JSONResponse(
+        content=jsonable_encoder(LoginResponseModel(**response)),
+        status_code=status.HTTP_200_OK,
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="Lax",
+        max_age=1800,
+    )
+
+    # Debugging: Check the cookie in headers instead
+    print("Set-Cookie header:", response.headers.get("set-cookie"))
+    return response
 
 
-@router.post("/signin/", response_model=LoginResponseModel)
+@router.post("/signin/")
 async def login_for_access_token(
     form_data: LoginRequestModel, db: Session = Depends(get_db)
 ):
@@ -152,11 +163,23 @@ async def login_for_access_token(
                 "created_at": user.created_at.isoformat(),
                 "updated_at": user.updated_at.isoformat()
             },
-        },
-        "access_token": access_token,
-        "token_type": "bearer"
+        }
     }
-    return LoginResponseModel(**response_data)
+
+    response = JSONResponse(
+        content=jsonable_encoder(LoginResponseModel(**response_data)),
+        status_code=status.HTTP_200_OK,
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="Lax",
+        max_age=1800,
+    )
+    print("Set-Cookie header:", response.headers.get("set-cookie"))
+    return response
 
 
 
@@ -306,12 +329,12 @@ async def validate(request: Request):
             user=user, expires_delta=access_token_expires
         )
 
-        frontend_redirect_url = f"http://localhost:3000"
+        frontend_redirect_url = f"http://localhost:3000/chat"
         
         return RedirectResponse(
             url=frontend_redirect_url,
             headers={
-                "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=1800",
+                "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=1800",
             },
             status_code=302,
         )
@@ -319,38 +342,3 @@ async def validate(request: Request):
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail=f"Internal Server Error, {e}")
-
-
-
-#     # ✅ Set secure HTTP-only cookie
-#     response.set_cookie(
-#         key="access_token",
-#         value=access_token,
-#         httponly=True,
-#         secure=not IS_DEV,
-#         samesite="Lax"
-#         max_age=1800
-#     )
-
-#     return response
-
-
-# key="access_token",
-# value=access_token,
-# httponly=True,  # Prevents JavaScript access
-# secure=True,  # Only send over HTTPS
-# samesite="Strict",  # Prevents CSRF
-# max_age=1800  # 30 minutes
-
-
-
-
-
-# Get redirect path from query params (default to home "/")
-# redirect_path = request.query_params.get("redirect", "/")
-
-# # Ensure the redirect path is safe
-# if not redirect_path.startswith("/"):
-#     raise HTTPException(status_code=400, detail="Invalid redirect path")
-
-# frontend_redirect_url = f"http://localhost:3000{redirect_path}"
