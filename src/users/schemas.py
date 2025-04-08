@@ -5,50 +5,48 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+import uuid
+from typing import List
 
 
-class UserBase(BaseModel):
-    email: str | None = None
-    # disabled: bool | None = None
-
-class UserCreate(UserBase):
+class UserCreateModel(BaseModel):
+    email: EmailStr
     password: str
 
-class UserInDB(UserBase):
+    class Config:
+        from_attributes = True
+
+# User login model
+class UserLoginModel(BaseModel):
+    email: EmailStr
     password: str
 
-
+    class Config:
+        from_attributes = True
 
 # User response model
 class UserModel(BaseModel):
     email: str
     id: UUID
-    is_email_verified: Optional[bool] = False
+    is_verified: Optional[bool] = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-
-class LoginRequestModel(BaseModel):
-    email: str
-    password: str
-
-
-class DataModel(BaseModel):
-    user: UserModel
-
-class LoginResponseModel(BaseModel):
-    status: bool
-    message: str
-    data: DataModel
-    # access_token: str
-    # token_type: str = "bearer"
 
     class Config:
         from_attributes = True
 
-class RegisterResponseModel(BaseModel):
+class LoginResponseReadModel(BaseModel):
+    status: bool
+    message: str
+    data: UserModel
+
+    class Config:
+        from_attributes = True
+
+class RegisterResponseReadModel(BaseModel):
     status: bool = True
     message: str = "Request successful"
-    data: DataModel
+    data: UserModel
     
 
     class Config:
@@ -62,12 +60,23 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str | None = None
+
+class TokenUser(BaseModel):
+    email: str
+    id: UUID
+    is_verified: bool
+    access_token: str
+
+    class Config:
+        from_attributes = True
     
 class GooglePayload(BaseModel):
     sub: Optional[Any] = None
+    email: str
     name: str
     picture: str
-    is_email_verified: bool
+    is_verified: bool
+    verification_token: str
 
 
 class GetTokenRequest(BaseModel):
@@ -77,3 +86,5 @@ class GetTokenResponse(BaseModel):
     status: bool
     message: str
     data: TokenData
+
+

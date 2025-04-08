@@ -1,19 +1,21 @@
 from __future__ import print_function
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
-from src.configs.config import BREVO_API_KEY, EMAIL_FROM, BACKEND_URL, FRONTEND_URL
-from pprint import pprint
+from src.config import settings
 from typing import Optional
 
+
 def send_verification_email(to_email: str, verification_token: str):
+    print("Sending verification email to: ", to_email)
+    print("The verification token is: ", verification_token)
     configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = BREVO_API_KEY
+    configuration.api_key['api-key'] = settings.BREVO_API_KEY
 
     api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
-    verification_link = f"{FRONTEND_URL}/auth/verify-email?token={verification_token}"
+    verification_link = f"{settings.FRONTEND_URL}/auth/verify-email?token={verification_token}"
 
-    sender = {"name": "GovLLMiner", "email": EMAIL_FROM}
+    sender = {"name": "GovLLMiner", "email": settings.EMAIL_FROM}
     to = [{"email": to_email}]
     
     subject = "Verify Your Email Address"
@@ -37,6 +39,6 @@ def send_verification_email(to_email: str, verification_token: str):
 
     try:
         api_response = api_instance.send_transac_email(send_smtp_email)
-        pprint(api_response)
+        print(api_response)
     except ApiException as e:
         print(f"Exception when calling SMTPApi->send_transac_email: {e}\n")

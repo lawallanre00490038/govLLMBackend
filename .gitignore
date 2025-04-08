@@ -2,3 +2,8 @@ env/
 .env
 MYREADME.md
 test.db
+keys/
+
+/rough
+
+/venv

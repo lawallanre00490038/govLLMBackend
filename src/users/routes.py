@@ -1,195 +1,135 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-import httpx
-import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from src.db.main import get_session
+from src.db.models import User
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.errors import UserAlreadyExists, InvalidCredentials, InvalidToken
+from .schemas import LoginResponseReadModel, RegisterResponseReadModel, UserCreateModel, UserLoginModel
+from .service import UserService
+from .auth import create_access_token, get_current_user
+from typing import Annotated
+from .auth import create_access_token, get_current_user
+from fastapi.encoders import jsonable_encoder
+from fastapi import Response, Depends
+import uuid
+from .auth import verify_email_response
+from .schemas import GooglePayload
+from src.config import settings
 from datetime import timedelta
-from starlette.requests import Request
-from authlib.integrations.starlette_client import OAuth
-from src.configs.config import CLIENT_ID, CLIENT_SECRET
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from src.db.database import engine, Base, get_db, SessionLocal
-from src.models.user import User
-from .schemas import  UserInDB, LoginResponseModel, RegisterResponseModel, LoginRequestModel, GooglePayload, GetTokenRequest
-from .utils.auth import not_verified_user, authenticate_user, create_access_token, get_current_active_user, get_password_hash, authenticate_google_user, add_google_user
-from .utils.email import send_verification_email
-from dotenv import load_dotenv
-from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.encoders import jsonable_encoder
+import httpx
+from starlette.requests import Request
 
-Base.metadata.create_all(bind=engine)
-load_dotenv()
-
-router = APIRouter()
-oauth = OAuth()
-import os
-
-# Detect if running in development mode
-IS_DEV = os.getenv("ENV", "development") == "development"
-print("Running in development mode:", IS_DEV)
+auth_router = APIRouter()
 
 
-
-@router.post("/signup/", response_model=RegisterResponseModel)
+@auth_router.post("/signup", response_model=RegisterResponseReadModel)
 async def register_user(
-    user: UserInDB,
-    db: Session = Depends(get_db),
+    user: UserCreateModel,
+    session: Annotated[AsyncSession, Depends(get_session)]
 ):
-    """
-    Register a new user and send a verification email in the background.
-    """
-    existing_user = db.query(User).filter(User.email == user.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    verification_token = str(uuid.uuid4()) 
-
-    db_user = User(
-        email=user.email,
-        password=get_password_hash(user.password),
-        is_email_verified=False,
-        verification_token=verification_token
-    )
-
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-
-    print(f"Generated Token for {db_user.email}: {verification_token}")
-    print(f"Stored Token in DB: {db_user.verification_token}")
-    send_verification_email(user.email, verification_token)
-
-    response = {
-            "status": True,
-            "message": "User created successfully, check your email for verification",
-            "data": {
-                "user": {
-                    "id": str(db_user.id),
-                    "email": db_user.email,
-                    "is_email_verified": db_user.is_email_verified,
-                    "created_at": db_user.created_at.isoformat(),
-                    "updated_at": db_user.updated_at.isoformat()
-                }
-            },
-        }
-    print("The response before the verification is:", response)
-    return RegisterResponseModel(**response)
+    """Register a new user."""
+    user_service = UserService()
+    try:
+        new_user = await user_service.create_user(user, session)
+        return RegisterResponseReadModel(
+            status=True,
+            message="User created successfully. Please check your mail to verify your account.",
+            data=jsonable_encoder(new_user)
+        )
+    except UserAlreadyExists:
+        raise UserAlreadyExists()
 
 
+@auth_router.post("/login", response_model=LoginResponseReadModel)
+async def login(
+    form_data: UserLoginModel,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response 
+):
+    """Login user and return access token."""
+    user_service = UserService()
+    try:
+        user = await user_service.authenticate_user(form_data.email, form_data.password, session)
+        access_token = create_access_token(user=user)
 
-@router.post("/verify-email/")
-async def verify_email(token: str = Query(...),  db: Session = Depends(get_db)):
-    print("The token is", token)
-    user = db.query(User).filter(User.verification_token == token).first()
+         # Set the access token as a cookie
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            max_age=3600,
+            samesite="lax"
+        )
+
+        return LoginResponseReadModel(
+            status=True,
+            message="Login successful",
+            data=user
+        )
+    except Exception as e:
+        print("The error from the login function is", e)
+        raise InvalidCredentials()
+
+
+
+
+@auth_router.post("/verify-email/", response_model=LoginResponseReadModel)
+async def verify_email(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response,
+    token: str = Query(..., description="Verification token from email"),
+):
+    """Verify user's email using the provided token."""
     
-    if not user:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
-
-    user.is_email_verified = True
-    user.verification_token = None 
-    db.commit()
-
-    access_token_expires = timedelta(minutes=30)
-    access_token = create_access_token(
-        user=user, expires_delta=access_token_expires
-    )
-    response = {
-            "status": True,
-            "message": "User created successfully",
-            "data": {
-                "user": {
-                    "email": user.email,
-                    "id": str(user.id),
-                    "is_email_verified": user.is_email_verified,
-                    "created_at": user.created_at.isoformat(),
-                    "updated_at": user.updated_at.isoformat()
-                }
-            },
-        }
-    response = JSONResponse(
-        content=jsonable_encoder(LoginResponseModel(**response)),
-        status_code=status.HTTP_200_OK,
-        headers={
-            "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=1800",
-        },
-    )
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="Lax",
-        max_age=1800,
-    )
-
-    # Debugging: Check the cookie in headers instead
-    print("Set-Cookie header:", response.headers.get("set-cookie"))
-    return response
+    # Initialize UserService instance
+    user_service = UserService()
+    
+    try:
+        # Retrieve user based on the verification token
+        user = await user_service.verify_token(token, session)
+        print("The user from the verify email function is", user)
+        
+        if not user:
+            raise InvalidToken()
+        
+        # Update user verification status
+        user.is_verified = True
+        user.verification_token = None
+        
+        # Commit changes to the database
+        await session.commit()
+        await session.refresh(user)
+        
+        # Generate access token for the verified user
+        access_token = create_access_token(user=user)
+        
+        # Prepare response
+        response = verify_email_response(user, access_token, response)
+        
+        return response
+    
+    except Exception as e:
+        print("The error is", e)
+        # Handle generic exceptions with a meaningful error message
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to verify email. Please try again."
+        )
 
 
-@router.post("/signin/")
-async def login_for_access_token(
-    form_data: LoginRequestModel, db: Session = Depends(get_db)
+
+@auth_router.get("/users/me")
+async def read_users_me(
+    current_user: Annotated[User, Depends(get_current_user)]
 ):
-    """
-        Login a user.
-        If the email and password are correct, it will return the user data and access token.
-        If the email and password are incorrect, it will raise a 401 error.
-    """
-    user = authenticate_user(db, form_data.email, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if not_verified_user(db, form_data.email):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email not verified, Please verify your email to continue",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token_expires = timedelta(minutes=30)
-    access_token = create_access_token(
-        user=user, expires_delta=access_token_expires
-    )
-
-    response_data = {
-        "status": True,
-        "message": "User login successful",
-        "data": {
-            "user": {
-                "email": user.email,
-                "id": str(user.id),
-                "is_email_verified": user.is_email_verified,
-                "created_at": user.created_at.isoformat(),
-                "updated_at": user.updated_at.isoformat()
-            },
-        }
-    }
-
-    response = JSONResponse(
-        content=jsonable_encoder(LoginResponseModel(**response_data)),
-        status_code=status.HTTP_200_OK,
-        headers={
-            "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=1800",
-        },
-    )
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="Lax",
-        max_age=1800,
-    )
-    print("Set-Cookie header:", response.headers.get("set-cookie"))
-    return response
+    """Get details of the current user."""
+    return current_user
 
 
-
-@router.get("/signin/google/")
+@auth_router.get("/signin/google/")
 async def google_login(request: Request):
     """
         Redirect the user to Google login page.
@@ -197,11 +137,11 @@ async def google_login(request: Request):
     """
     print("The request is", request.headers.get("Referer"))
     redirect_uri = request.url_for('auth')
-    google_auth_url = f"https://accounts.google.com/o/oauth2/auth?client_id={CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=openid email profile"
+    google_auth_url = f"https://accounts.google.com/o/oauth2/auth?GOOGLE_CLIENT_ID={settings.CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=openid email profile"
 
     return RedirectResponse(url=google_auth_url)
 
-@router.get("/auth", include_in_schema=False)
+@auth_router.get("/auth", include_in_schema=False)
 async def auth(code: str, request: Request):
     """
         This routes is automatically called by the google route
@@ -212,8 +152,8 @@ async def auth(code: str, request: Request):
     token_request_uri = "https://oauth2.googleapis.com/token"
     data = {
         'code': code,
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
+        'GOOGLE_CLIENT_ID': settings.CLIENT_ID,
+        'GOOGLE_CLIENT_SECRET': settings.CLIENT_SECRET,
         'redirect_uri': request.url_for('auth'),
         'grant_type': 'authorization_code',
     }
@@ -230,7 +170,7 @@ async def auth(code: str, request: Request):
     try:
         id_info = id_token.verify_oauth2_token(
             id_token_value, requests.Request(), 
-            CLIENT_ID,
+            settings.CLIENT_ID,
             clock_skew_in_seconds=2
         )
 
@@ -239,7 +179,7 @@ async def auth(code: str, request: Request):
             "email": id_info.get('email'),
             "name": id_info.get('name'),
             "picture": id_info.get('picture'),
-            "is_email_verified": id_info.get('email_verified'),
+            "is_verified": id_info.get('email_verified'),
             "verification_token": str(uuid.uuid4())
         }
 
@@ -258,73 +198,19 @@ async def auth(code: str, request: Request):
 
 
 
-@router.get("/users/me/")
-async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
-    return current_user
-
-# delete account
-@router.delete("/users/delete_me/")
-async def delete_user(current_user: UserInDB = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == current_user.email).first()
-    db.delete(user)
-    db.commit()
-    return {"message": "User deleted successfully"}
-
-
-@router.post("/users/request-email-verification/", response_model=RegisterResponseModel, include_in_schema=True)
-async def get_token_to_verify_email( form_data: GetTokenRequest):
-    """
-        If a users email is not verified, generate a token and send a verification email.
-        This is only used when a user tries to login with an email and their email has not been verified.
-    """
-    db = SessionLocal()
-    existing_user = authenticate_google_user(db, form_data.email)
-    if not existing_user:
-        raise HTTPException(status_code=400, detail="Email not registered. Please signup")
-    if not not_verified_user(db, form_data.email):
-        raise HTTPException(status_code=400, detail="Email already verified. Please signin")
-    
-    verification_token = str(uuid.uuid4()) 
-    existing_user.verification_token = verification_token
-    db.commit()
-
-
-    print(f"Generated Token for {existing_user.email}: {verification_token}")
-    print(f"Stored Token in DB: {existing_user.verification_token}")
-    send_verification_email(existing_user.email, verification_token)
-
-    response = {
-            "status": True,
-            "message": "Token created successfully, check your email for verification",
-            "data": {
-                "user": {
-                    "id": str(existing_user.id),
-                    "email": existing_user.email,
-                    "is_email_verified": existing_user.is_email_verified,
-                    "created_at": existing_user.created_at.isoformat(),
-                    "updated_at": existing_user.updated_at.isoformat()
-                }
-            },
-        }
-    print("The response before the verification is:", response)
-    return RegisterResponseModel(**response)
-
-
-
 async def validate(request: Request):
     user_data = request.session.get('user_data')
     print("The user data is", user_data)
-    db = SessionLocal()
-    if not user_data or "email" not in user_data:
-        raise HTTPException(status_code=401, detail="User not authenticated")
+    user_service = UserService()
+    user = user_service.get_user_by_email(user_data["email"], request.session)
     try:
-        user = await authenticate_google_user(db, user_data["email"]) 
+        user = await user_service.get_user_by_email(user_data["email"], request.session)
         print("The user from the validate function", user)
         if user:
             print("Following the path of existing user")
         else:
             print("Following the path of new user")
-            user = await add_google_user(db, user_data) 
+            user = await user_service.create_user(user_data, request.session) 
 
         if not user:
             raise HTTPException(status_code=500, detail="User creation failed")
@@ -335,7 +221,7 @@ async def validate(request: Request):
             user=user, expires_delta=access_token_expires
         )
 
-        frontend_redirect_url = f"http://localhost:3000/chat"
+        frontend_redirect_url = f"http://localhost:3000/profile"
         
         return RedirectResponse(
             url=frontend_redirect_url,
