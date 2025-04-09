@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Optional
 from sqlmodel import select, Session
 from src.db.models import User
-from src.errors import UserAlreadyExists, InvalidCredentials
-from .schemas import UserCreateModel
+from src.errors import UserAlreadyExists, InvalidCredentials, EmailAlreadyVerified
+from .schemas import UserCreateModel, VerificationMailSchemaResponse
 from .auth import generate_passwd_hash, verify_password
 from .email import send_verification_email
 import uuid
@@ -76,3 +76,37 @@ class UserService:
         await session.commit()
         await session.refresh(user)
         return user
+    
+    async def delete_user(self, user: User, session: AsyncSession) -> None:
+        """Delete a user from the database."""
+        db_user = await session.get(User, user.id)  # get ORM instance
+        if db_user:
+            await session.delete(db_user)
+            await session.commit()
+            return
+        else:
+            raise InvalidCredentials()
+        
+    # resend verification email
+    async def resend_verification_email(self, email: str, session: AsyncSession) -> VerificationMailSchemaResponse:
+        """Resend the verification email to the user."""
+        try:
+            user = await self.get_user_by_email(email, session)
+            if user:
+                if user.is_verified:
+                    raise EmailAlreadyVerified()
+                verification_token = str(uuid.uuid4())
+                user.verification_token = verification_token
+                session.add(user)
+                await session.commit()
+                send_verification_email(user.email, verification_token)
+            else:
+                raise InvalidCredentials()
+            return VerificationMailSchemaResponse(
+                status=True,
+                message="Verification email sent successfully",
+                verification_token=verification_token
+            )
+        except Exception as e:
+            await session.rollback()
+            raise e

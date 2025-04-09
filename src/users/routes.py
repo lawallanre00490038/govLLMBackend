@@ -5,7 +5,7 @@ from src.db.main import get_session
 from src.db.models import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.errors import UserAlreadyExists, InvalidCredentials, InvalidToken
-from .schemas import LoginResponseReadModel, RegisterResponseReadModel, UserCreateModel, UserLoginModel
+from .schemas import LoginResponseReadModel, RegisterResponseReadModel, UserModel, DeleteResponseModel, UserCreateModel, UserLoginModel, TokenUser, VerificationMailSchemaResponse
 from .service import UserService
 from .auth import create_access_token, get_current_user
 from typing import Annotated
@@ -197,6 +197,52 @@ async def auth(code: str, request: Request):
 
 
 
+
+# refresh token
+@auth_router.get("/refresh-token", response_model=TokenUser)
+async def refresh_token(
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """Refresh the access token for the current user."""
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(
+        user=current_user, expires_delta=access_token_expires
+    )
+    return TokenUser(
+        email=current_user.email,
+        id=current_user.id,
+        is_verified=current_user.is_verified,
+        access_token=access_token,
+        token_type="bearer"
+    )
+
+# resend verification token
+@auth_router.post("/resend-verification-token", response_model=VerificationMailSchemaResponse)
+async def resend_verification_token(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response,
+    email: str = Query(..., description="Email of the user to resend verification token"),
+):
+    """Resend the verification token to the user's email."""
+    user_service = UserService()
+    response = await user_service.resend_verification_email(email, session)
+
+    return response
+        
+
+# delete user
+@auth_router.delete("/delete-user", response_model=DeleteResponseModel)
+async def delete_user(
+    current_user: Annotated[TokenUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    user_service = UserService()
+    await user_service.delete_user(current_user, session)
+
+    return DeleteResponseModel(
+        status=True,
+        message="User deleted successfully"
+    )
 
 
 async def validate(request: Request):

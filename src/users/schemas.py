@@ -53,6 +53,11 @@ class RegisterResponseReadModel(BaseModel):
     class Config:
         from_attributes = True
 
+class DeleteResponseModel(BaseModel):
+    status: bool
+    message: str
+    # user: dict
+
 
 class Token(BaseModel):
     access_token: str
@@ -67,6 +72,15 @@ class TokenUser(BaseModel):
     id: UUID
     is_verified: bool
     access_token: str
+    token_type: Optional[str] = "bearer"
+
+    class Config:
+        from_attributes = True
+
+class VerificationMailSchemaResponse(BaseModel):
+    status: bool
+    message: str
+    verification_token: str
 
     class Config:
         from_attributes = True

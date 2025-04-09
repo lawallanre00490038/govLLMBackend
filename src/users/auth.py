@@ -110,7 +110,8 @@ async def get_current_user(
             email=email,
             id=user_id,
             is_verified=payload.get("is_verified"),
-            access_token=access_token
+            access_token=access_token,
+            token_type="bearer"
         )
 
     except jwt.ExpiredSignatureError:

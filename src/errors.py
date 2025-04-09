@@ -44,6 +44,12 @@ class UserAlreadyExists(GovLLMiner):
         super().__init__(message=message, error_code="user_exists")
 
 
+class EmailAlreadyVerified(GovLLMiner):
+    """User has provided an email for a user who has already been verified."""
+    def __init__(self, message: str = "Email already verified"):
+        super().__init__(message=message, error_code="email_already_verified")
+
+
 # ========================================== Chat API & Session Errors
 class ChatAPIError(GovLLMiner):
     """Raised when an error occurs while communicating with the external chat API."""
@@ -149,6 +155,17 @@ def register_all_errors(app: FastAPI):
             initial_detail={
                 "message": "User not found",
                 "error_code": "user_not_found",
+            },
+        ),
+    )
+
+    app.add_exception_handler(
+        EmailAlreadyVerified,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_detail={
+                "message": "Email already verified",
+                "error_code": "email_already_verified",
             },
         ),
     )
