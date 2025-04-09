@@ -37,6 +37,7 @@ async def register_user(
         return RegisterResponseReadModel(
             status=True,
             message="User created successfully. Please check your mail to verify your account.",
+            verification_token=new_user.verification_token,
             data=jsonable_encoder(new_user)
         )
     except UserAlreadyExists:

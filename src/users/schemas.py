@@ -46,6 +46,7 @@ class LoginResponseReadModel(BaseModel):
 class RegisterResponseReadModel(BaseModel):
     status: bool = True
     message: str = "Request successful"
+    verification_token: str
     data: UserModel
     
 
