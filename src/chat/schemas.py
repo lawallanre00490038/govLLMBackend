@@ -33,10 +33,16 @@ class GroupedChatResponseModel(BaseModel):
     sessions: List[SessionSchemaModel]
 
 
+class FolderUploadCreateModel(BaseModel):
+    file_path: str
+    file_type: str
 
 
 
 class ChatRequestSchema(BaseModel):
+    message: str
+
+class ChatResponseSchema(BaseModel):
     message: str
 
 class Message(BaseModel):

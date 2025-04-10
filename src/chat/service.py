@@ -12,6 +12,7 @@ from fastapi import UploadFile
 from typing import Dict, Any
 from src.errors import ChatAPIError, DatabaseError, InvalidToken, ChatSessionSaveError, NoChatSessionsFound, FileUploadError, ChatUploadError, RAGQueryError, DirectQueryError
 from sqlalchemy.exc import SQLAlchemyError
+from .schemas import FolderUploadCreateModel
 
 
 class ChatAPIClient:
@@ -81,102 +82,6 @@ class ChatAPIClient:
         await session.rollback()
         raise ChatSessionSaveError()
 
-#   async def get_chats_by_user(
-#     self,
-#     data: GetAllChatRequestSchema,
-#     session: AsyncSession,
-# ) -> TotalChatResponse:
-#     """
-#     Get all chat sessions for a user with their latest message timestamp.
-#     """
-#     # Validate order parameter
-#     if data.order not in ["asc", "desc"]:
-#         raise HTTPException(status_code=400, detail="Invalid order parameter")
-
-#     # Base query
-#     query = (
-#         select(
-#             ChatSession,
-#             func.max(ChatMessage.created_at).label("latest_message_time")
-#         )
-#         .join(ChatMessage, ChatSession.id == ChatMessage.session_id)
-#         .where(ChatSession.user_id == data.user_id)
-#         .group_by(ChatSession.id)
-#     )
-
-#     # Add sorting
-#     order_clause = (
-#         desc("latest_message_time") 
-#         if data.order == "desc" 
-#         else asc("latest_message_time")
-#     )
-#     query = query.order_by(order_clause)
-
-#     # Pagination
-#     query = query.limit(data.size).offset((data.page - 1) * data.size)
-
-#     # Execute query
-#     result = await session.execute(query)
-#     sessions = result.scalars().all()
-
-#     # Get total count
-#     count_query = select(func.count()).select_from(ChatSession).where(ChatSession.user_id == data.user_id)
-#     total = (await session.execute(count_query)).scalar()
-
-#     if not sessions:
-#         raise HTTPException(status_code=404, detail="No chats found")
-
-#     return TotalChatResponse(
-#         user_id=data.user_id,
-#         chats=sessions,
-#         page=data.page,
-#         size=data.size,
-#         total=total
-#     )
-
-#   async def get_chats_by_user(
-#     self,
-#     data: GetAllChatRequestSchema,
-#     session: AsyncSession,
-# ) -> TotalChatResponse:
-#     # Validate order parameter
-#     if data.order not in ["asc", "desc"]:
-#         raise HTTPException(status_code=400, detail="Invalid order parameter")
-
-#     # Query messages directly
-#     query = (
-#         select(ChatMessage)
-#         .join(ChatSession)
-#         .where(ChatSession.user_id == data.user_id)
-#         .order_by(
-#             ChatMessage.created_at.desc() 
-#             if data.order == "desc" 
-#             else ChatMessage.created_at.asc()
-#         )
-#     )
-
-#     # Pagination
-#     query = query.limit(data.size).offset((data.page - 1) * data.size)
-    
-#     result = await session.execute(query)
-#     messages = result.scalars().all()
-
-#     # Get total count
-#     count_query = (
-#         select(func.count())
-#         .select_from(ChatMessage)
-#         .join(ChatSession)
-#         .where(ChatSession.user_id == data.user_id)
-#     )
-#     total = (await session.execute(count_query)).scalar()
-
-#     return TotalChatResponse(
-#         user_id=data.user_id,
-#         chats=messages,  # Now returns ChatMessage objects
-#         page=data.page,
-#         size=data.size,
-#         total=total
-#     )
 
   async def get_chats_by_user_grouped(
     self,
@@ -273,15 +178,19 @@ class ChatAPIClient:
       }
 
       try:
+          timeout = httpx.Timeout(10.0)
           response = await self.client.post(
             f"{self.base_url}/{endpoint}",
             files=files,
-            headers={"Authorization": f"Bearer {token}"}
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=timeout
           )
           response.raise_for_status()
           return response.json()
-      except Exception as e:
-          raise FileUploadError()
+      except httpx.HTTPStatusError as e:
+        print("HTTP error:", e.response.status_code)
+        print("Response content:", e.response.text)
+        raise FileUploadError()
 
 
   async def proxy_rag_query_service(
@@ -331,4 +240,19 @@ class ChatAPIClient:
       return result["answer"]
     except Exception as e:
         raise DirectQueryError()
-
+    
+  async def list_features_service(
+    self,
+    session: AsyncSession,
+    endpoint: str,
+    token: str,
+  ):
+    try:
+        response = await self.client.get(
+            f"{self.base_url}/{endpoint}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        raise ChatAPIError()

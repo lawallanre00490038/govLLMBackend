@@ -7,3 +7,6 @@ keys/
 /rough
 
 /venv
+
+/src/chat/upload/README.md
+/src/chat/upload/upload_json.json

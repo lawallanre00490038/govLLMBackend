@@ -35,6 +35,10 @@ class RefreshTokenRequired(GovLLMiner):
 
     pass
 
+class FolderIngestionError(GovLLMiner):
+    """Raised when folder ingestion fails."""
+    def __init__(self, message: str = "Folder ingestion failed"):
+        super().__init__(message=message, error_code="folder_ingestion_error")
 
 
 class UserAlreadyExists(GovLLMiner):
@@ -144,6 +148,28 @@ def register_all_errors(app: FastAPI):
             initial_detail={
                 "message": "User with email already exists",
                 "error_code": "user_exists",
+            },
+        ),
+    )
+
+    app.add_exception_handler(
+        FileUploadError,
+        create_exception_handler(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            initial_detail={
+                "message": "File upload failed",
+                "error_code": "file_upload_error",
+            },
+        ),
+    )
+
+    app.add_exception_handler(
+        FolderIngestionError,
+        create_exception_handler(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            initial_detail={
+                "message": "Folder ingestion failed",
+                "error_code": "folder_ingestion_error",
             },
         ),
     )
@@ -291,18 +317,6 @@ def register_all_errors(app: FastAPI):
         ),
     )
 
-
-    app.add_exception_handler(
-        FileUploadError,
-        create_exception_handler(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            initial_detail={
-                "message": "File upload failed",
-                "error_code": "file_upload_error",
-            },
-        ),
-    )
-
     app.add_exception_handler(
         ChatUploadError,
         create_exception_handler(
@@ -342,7 +356,7 @@ def register_all_errors(app: FastAPI):
 
         return JSONResponse(
             content={
-                "message": "Oops! Something went wrong",
+                "message": "Oops! Something went wrong with the server",
                 "error_code": "server_error",
             },
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -354,7 +368,7 @@ def register_all_errors(app: FastAPI):
         print(str(exc))
         return JSONResponse(
             content={
-                "message": "Oops! Something went wrong",
+                "message": "Oops! Something went wrong with the database",
                 "error_code": "server_error",
             },
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

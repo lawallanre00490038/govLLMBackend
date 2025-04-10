@@ -2,11 +2,12 @@ from sqlmodel import Field, SQLModel, Column, Relationship
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy import DateTime
-from sqlalchemy.dialects.postgresql import UUID
 import sqlalchemy.dialects.postgresql  as pg
 import uuid
 from sqlmodel import Field, SQLModel, Column, Relationship
-from sqlalchemy.orm import relationship
+from sqlalchemy import Enum
+from enum import Enum as PyEnum
+from sqlalchemy.dialects.postgresql import ENUM
 
 class ChatSession(SQLModel, table=True):
     __tablename__ = "chat_sessions"
@@ -73,3 +74,31 @@ class User(SQLModel, table=True):
 
     def __repl__(self):
         return f"User {self.email}"
+
+
+
+
+# ============================================Folder Models
+class UploadSource(PyEnum):
+    GOOGLE_DRIVE = "google_drive"
+    ONEDRIVE = "onedrive"
+    LOCAL = "local"
+    
+
+class FolderUpload(SQLModel, table=True):
+    __tablename__ = "folder_uploads"
+    id : uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    source: UploadSource = Field(sa_column=Column(ENUM(UploadSource, name="upload_source_enum"), nullable=False)) 
+    local_path: str = Field(default=None)
+    file_type : str = Field(default=None)
+    ingestion_status:  str = Field(default="pending")
+    cleanup_status: str = Field(default="pending")
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))

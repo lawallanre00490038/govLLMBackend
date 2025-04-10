@@ -17,3 +17,4 @@ pydantic-settings
 pydantic[email]
 httpx
 firebase-admin
+aiofiles

@@ -7,6 +7,7 @@ from src.db.main import create_tables
 from contextlib import asynccontextmanager
 import logging
 from src.chat.routes import chat_router
+from src.chat.upload.routes import folder_router
 
 # # logging.basicConfig(level=logging.DEBUG)
 # logging.basicConfig()    
@@ -57,6 +58,12 @@ app = FastAPI(
 async def root():
     return {"message": "Welcome to GovLLminer API"}
 
+
+# Health check
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 # Register error handlers and middleware
 register_all_errors(app)
 register_middleware(app)
@@ -73,6 +80,13 @@ app.include_router(
     prefix=f"{version_prefix}/chat",
     tags=["Chat"]
 )
+
+app.include_router(
+    folder_router,
+    prefix=f"{version_prefix}/upload",
+    tags=["Upload"]
+)
+
 
 if __name__ == "__main__":
     ENV = os.getenv("ENV", "development")

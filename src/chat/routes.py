@@ -10,9 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.main import get_session
 from uuid import UUID
 from src.db.models import ChatMessage, User
-from fastapi import Form, Request, File
+from fastapi import Form, Request, File, HTTPException
 from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel
-from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema
+from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema
+from src.users.schemas import TokenUser
 from src.errors import ChatAPIError
 import uuid
 from typing import Optional
@@ -21,11 +22,13 @@ from typing import Optional
 chat_router = APIRouter()
 chat_client = ChatAPIClient()
 
+ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png", "audio/mpeg", "audio/wav"}
+
 @chat_router.post("/")
 async def handle_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: ChatRequestSchema,
-    current_user: User = Depends(get_current_user)
+    current_user: TokenUser = Depends(get_current_user)
 ):
     """
       Send a chat request to the external API and save the response in the database.
@@ -52,7 +55,7 @@ async def handle_chat(
 async def handle_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: ChatRequestSchema,
-    current_user: User = Depends(get_current_user)
+    current_user: TokenUser = Depends(get_current_user)
 ):
     """
       Send a chat request to the external API and streams the response in a custom way.
@@ -62,27 +65,6 @@ async def handle_chat(
       Returns:
           StreamingResponse: The response from the API.
     """
-    # user_id = str(current_user.id)
-
-    # result = await chat_client.send_chat_request(
-    #     session=session,
-    #     endpoint="chat", 
-    #     data={"message": request.message, "user_id": user_id}, 
-    #     token=current_user.access_token
-    #   )
-    
-    # full_response = result
-
-    # async def simulated_event_generator(content: str):
-    #   print(content)
-    #   for word in content.split():
-    #       await asyncio.sleep(0.1) 
-    #       yield f"data: {word} \n"
-
-    # return StreamingResponse(
-    #     simulated_event_generator(full_response),
-    #     media_type="text/event-stream"
-    # )
 
     try:
       response = await chat_client.send_chat_request(
@@ -137,15 +119,16 @@ async def get_grouped_chats(
     )
 
 
-chat_router.post("/upload")
-async def chat_upload(
+
+chat_router.post("/file_upload_with_chat", response_model=ChatResponseSchema, include_in_schema=True)
+async def file_upload_with_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
     file: UploadFile = File(...),
     message: str = Form(...),
     session_id: Optional[str] = Form(None),
     document_id: Optional[str] = Form(None),
     clear_history: bool = Form(False),
-    current_user: User = Depends(get_current_user)
+    current_user: TokenUser = Depends(get_current_user)
     
 ):
     """
@@ -161,15 +144,18 @@ async def chat_upload(
       Returns:
           str: The response from the API.
     """
-    return await chat_client.proxy_chat_upload_service(
-      session,
-      "/chat/upload",
-      file, 
-      message, 
-      session_id, 
-      document_id, 
-      clear_history,
-      current_user.access_token
+    response = await chat_client.proxy_chat_upload_service(
+      session=session,
+      endpoint="/chat/upload",
+      file=file, 
+      message=message, 
+      session_id=session_id, 
+      document_id=document_id, 
+      clear_history=clear_history,
+      token=current_user.access_token
+    )
+    return ChatResponseSchema(
+        message=response
     )
 
 
@@ -177,29 +163,32 @@ async def chat_upload(
 async def upload_file(
     session: Annotated[AsyncSession, Depends(get_session)],
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
-  ):
+    current_user: TokenUser = Depends(get_current_user),
+):
     """
-      General file upload endpoint
+      Upload a file to the chat service of type in any: (pdf, image/png/jpeg, and audio/wav/mpeg).
       Args:
           file (UploadFile): The file to upload.
-          token (str): The authorization token.
       Returns:
           str: The response from the API.
     """
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
+    
     return await chat_client.proxy_file_upload_service(
-      session=session,
-      endpoint="upload",
-      file=file,
-      token=current_user.access_token
+        session=session,
+        endpoint="upload",
+        file=file,
+        token=current_user.access_token
     )
+
 
 
 @chat_router.post("/query/rag")
 async def query_rag(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: RagQueryRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: TokenUser = Depends(get_current_user)
 ):
     """
       RAG query endpoint, sends a query to the RAG service and returns the results.
@@ -226,7 +215,7 @@ async def query_rag(
 async def query_direct(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: DirectQueryRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: TokenUser = Depends(get_current_user)
 ):
     """
       Direct query endpoint
@@ -243,3 +232,22 @@ async def query_direct(
         payload=request.model_dump(),
         user=current_user
       )
+
+
+@chat_router.post("/list_features")
+async def list_features(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current_user: TokenUser = Depends(get_current_user)
+):
+    """
+      List all features
+      Args:
+          None
+      Returns:
+          dict: The response from the API.
+    """
+    return await chat_client.list_features_service(
+        session=session,
+        endpoint="features",
+        token=current_user.access_token
+)
