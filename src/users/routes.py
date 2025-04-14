@@ -130,6 +130,7 @@ async def read_users_me(
     return current_user
 
 
+
 @auth_router.get("/signin/google/")
 async def google_login(request: Request):
     """
@@ -138,7 +139,19 @@ async def google_login(request: Request):
     """
     print("The request is", request.headers.get("Referer"))
     redirect_uri = request.url_for('auth')
-    google_auth_url = f"https://accounts.google.com/o/oauth2/auth?GOOGLE_CLIENT_ID={settings.CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=openid email profile"
+
+    print("The redirect uri is", redirect_uri)
+    print("The google auth url is", settings.GOOGLE_CLIENT_ID)
+    
+    google_auth_url = (
+        f"https://accounts.google.com/o/oauth2/auth"
+        f"?client_id={settings.GOOGLE_CLIENT_ID}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope=openid email profile"
+        f"&access_type=offline"
+        f"&prompt=consent"
+    )
 
     return RedirectResponse(url=google_auth_url)
 
@@ -151,16 +164,19 @@ async def auth(code: str, request: Request):
         Send the user data to the user.
     """
     token_request_uri = "https://oauth2.googleapis.com/token"
+    print("The next url: ", request.url_for('auth'))
     data = {
         'code': code,
-        'GOOGLE_CLIENT_ID': settings.CLIENT_ID,
-        'GOOGLE_CLIENT_SECRET': settings.CLIENT_SECRET,
+        'client_id': settings.GOOGLE_CLIENT_ID,
+        'client_secret': settings.GOOGLE_CLIENT_SECRET,
         'redirect_uri': request.url_for('auth'),
         'grant_type': 'authorization_code',
     }
 
+
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
     async with httpx.AsyncClient() as client:
-        response = await client.post(token_request_uri, data=data)
+        response = await client.post(token_request_uri, data=data, headers=headers)
         response.raise_for_status()
         token_response = response.json()
 
@@ -171,7 +187,7 @@ async def auth(code: str, request: Request):
     try:
         id_info = id_token.verify_oauth2_token(
             id_token_value, requests.Request(), 
-            settings.CLIENT_ID,
+            settings.GOOGLE_CLIENT_ID,
             clock_skew_in_seconds=2
         )
 
@@ -185,6 +201,7 @@ async def auth(code: str, request: Request):
         }
 
         request.session["user_data"] = payload 
+        request.state.session = await get_session().__anext__() 
         print("The payload is", payload)
         response = await validate(request)
         return response
@@ -245,19 +262,29 @@ async def delete_user(
     )
 
 
+
 async def validate(request: Request):
     user_data = request.session.get('user_data')
-    print("The user data is", user_data)
+    print("The user data is from the google payload", user_data)
     user_service = UserService()
-    user = user_service.get_user_by_email(user_data["email"], request.session)
+    session: AsyncSession = request.state.session
+
+    email = user_data["email"]
+    print("The email is", email)
+    
     try:
-        user = await user_service.get_user_by_email(user_data["email"], request.session)
+        user = await user_service.get_user_by_email(email, session)
         print("The user from the validate function", user)
         if user:
             print("Following the path of existing user")
         else:
             print("Following the path of new user")
-            user = await user_service.create_user(user_data, request.session) 
+
+            user_model = UserCreateModel(
+                email=user_data["email"],
+                password="password"
+            )
+            user = await user_service.create_user(user_model, session, is_google=True) 
 
         if not user:
             raise HTTPException(status_code=500, detail="User creation failed")
@@ -268,7 +295,7 @@ async def validate(request: Request):
             user=user, expires_delta=access_token_expires
         )
 
-        frontend_redirect_url = f"http://localhost:3000/profile"
+        frontend_redirect_url = f"http://localhost:3000/chat"
         
         return RedirectResponse(
             url=frontend_redirect_url,

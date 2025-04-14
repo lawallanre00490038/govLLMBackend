@@ -22,28 +22,29 @@ class UserService:
         user = await self.get_user_by_email(email, session)
         return user is not None
 
-    async def create_user(self, user_data: UserCreateModel, session: AsyncSession):
-        user_data_dict = user_data.model_dump()
+    async def create_user(self, user_data: UserCreateModel, session: AsyncSession, is_google: Optional[bool] = False):
         """Create a new user in the database."""
         if await self.user_exists(user_data.email, session):
             raise UserAlreadyExists()
         
-        print("The data coming in: ", user_data_dict)
+        print("The data coming in: ", user_data)
         
         try:
             verification_token = str(uuid.uuid4()) 
-            hash_password = generate_passwd_hash(user_data_dict["password"])
+            hash_password = generate_passwd_hash(user_data.password)
 
             new_user = User(
                 email=user_data.email,
                 password=hash_password,
-                is_verified=False,
+                is_verified=True if is_google else False,
                 verification_token=verification_token
             )
 
             session.add(new_user)
             await session.commit()
-            send_verification_email(new_user.email, verification_token)
+
+            if not is_google:
+                send_verification_email(new_user.email, verification_token)
 
             return new_user
         except Exception as e:
@@ -77,13 +78,17 @@ class UserService:
         await session.refresh(user)
         return user
     
+        
     async def delete_user(self, user: User, session: AsyncSession) -> None:
         """Delete a user from the database."""
-        db_user = await session.get(User, user.id)  # get ORM instance
+        statement = select(User).where(User.id == user.id)
+        result = await session.execute(statement)
+        db_user = result.scalar_one_or_none()
+
         if db_user:
             await session.delete(db_user)
             await session.commit()
-            return
+            return None
         else:
             raise InvalidCredentials()
         
