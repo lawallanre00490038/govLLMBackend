@@ -34,7 +34,6 @@ async def handle_chat(
       Send a chat request to the external API and save the response in the database.
       Args:
           data (str): The data to send in the request.
-          token (str): The authorization token.
       Returns:
           str: The response from the API.
     """
@@ -102,7 +101,6 @@ async def get_grouped_chats(
       Fetch all chat sessions for a user and group them by session_id.
       Args:
           user_id (UUID): The user ID.
-          session (AsyncSession): The database session.
       Returns:
           GroupedChatResponse: The grouped chat response.
     """
@@ -120,7 +118,9 @@ async def get_grouped_chats(
 
 
 
-chat_router.post("/file_upload_with_chat", response_model=ChatResponseSchema, include_in_schema=True)
+
+
+@chat_router.post("/upload_file_with_chat", response_model=ChatResponseSchema, include_in_schema=True)
 async def file_upload_with_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
     file: UploadFile = File(...),
@@ -134,13 +134,11 @@ async def file_upload_with_chat(
     """
       Upload a file to the chat service.
       Args:
-          session (AsyncSession): The database session.
           file (UploadFile): The file to upload.
           message (str): The message to send with the file.
           session_id (str, optional): The session ID. Defaults to None.
           document_id (str, optional): The document ID. Defaults to None.
           clear_history (bool, optional): Whether to clear history. Defaults to False.
-          current_user (User): The current user.
       Returns:
           str: The response from the API.
     """
@@ -157,6 +155,11 @@ async def file_upload_with_chat(
     return ChatResponseSchema(
         message=response
     )
+
+
+
+
+
 
 
 @chat_router.post("/file/upload")
@@ -240,9 +243,7 @@ async def list_features(
     current_user: TokenUser = Depends(get_current_user)
 ):
     """
-      List all features
-      Args:
-          None
+      List all features.
       Returns:
           dict: The response from the API.
     """
