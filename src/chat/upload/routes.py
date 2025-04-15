@@ -36,7 +36,7 @@ async def upload_local_folder(
     """
 
     return await upload_api.upload_files(
-        endpoint="uploads",
+        endpoint="upload",
         files=files,
         file_type=file_type,
         user=user

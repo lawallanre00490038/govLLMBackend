@@ -53,6 +53,7 @@ class FolderIngestion:
                 if not file.filename.lower().endswith(f".{file_type}")
             ]
             if invalid_files:
+                print(f"Invalid files: {invalid_files}")
                 raise FileUploadError()
 
             # Save files
@@ -77,6 +78,7 @@ class FolderIngestion:
             )
         
         except HTTPException as e:
+            print(e)
             raise FileUploadError()
         
         finally:
