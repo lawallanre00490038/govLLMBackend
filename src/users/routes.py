@@ -305,22 +305,13 @@ async def validate(request: Request):
             status_code=302,
         )
 
-        # response.set_cookie(
-        #     key="access_token",
-        #     value=access_token,
-        #     httponly=True,
-        #     secure=True,     
-        #     samesite="lax",
-        #     max_age=1800,
-        #     path="/"
-        # )
-
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=True,
-            max_age=3600, 
-            samesite="lax"
+            secure=True,     
+            samesite="None",
+            max_age=1800,
         )
 
         return response
