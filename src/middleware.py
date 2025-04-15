@@ -66,6 +66,12 @@ from src.db.main import get_session
 logger = logging.getLogger("uvicorn.access")
 logger.disabled = True
 
+
+allowed_origins = [
+    "http://localhost:3000",  # For local development
+    "https://yourfrontenddomain.com",  # For production frontend
+]
+
 def register_middleware(app: FastAPI):
 
     @app.middleware("http")
@@ -85,7 +91,9 @@ def register_middleware(app: FastAPI):
         finally:
             await request.state.db.close()
         return response
+    
+
 
     app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True,)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost","127.0.0.1","0.0.0.0","*.onrender.com","govllmbackend.onrender.com"],)
+    app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True,)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost","127.0.0.1","0.0.0.0", "*.onrender.com","govllmbackend.onrender.com"],)
