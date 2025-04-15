@@ -297,13 +297,25 @@ async def validate(request: Request):
 
         frontend_redirect_url = f"http://localhost:3000/chat"
         
-        return RedirectResponse(
+        response =  RedirectResponse(
             url=frontend_redirect_url,
             headers={
                 "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=1800",
             },
             status_code=302,
         )
+
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,     
+            samesite="lax",
+            max_age=1800,
+            path="/"
+        )
+
+        return response
 
     except Exception as e:
         print("The error is", e)
