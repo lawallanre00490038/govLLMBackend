@@ -14,8 +14,7 @@ logger.disabled = True
 
 
 allowed_origins = [
-    "http://localhost:3000",  # For local development
-    "https://yourfrontenddomain.com",  # For production frontend
+    "http://localhost:3000",
 ]
 
 def register_middleware(app: FastAPI):
