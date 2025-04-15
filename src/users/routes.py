@@ -310,7 +310,7 @@ async def validate(request: Request):
             value=access_token,
             httponly=True,
             secure=True,     
-            samesite="None",
+            samesite="none",
             max_age=1800,
         )
 
