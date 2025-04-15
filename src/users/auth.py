@@ -126,7 +126,8 @@ def verify_email_response(user, access_token: str, response):
         value=access_token,
         httponly=True,
         max_age=3600,  # Cookie expiration time in seconds
-        samesite="lax"  # Adjust based on your cross-site requirements
+        samesite="none",
+        secure=True,
     )
 
     new_user = UserModel.model_validate(user)
