@@ -12,7 +12,7 @@ from uuid import UUID
 from src.db.models import ChatMessage, User
 from fastapi import Form, Request, File, HTTPException
 from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel
-from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema
+from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema, RagQueryResponse, FeatureListResponse
 from src.users.schemas import TokenUser
 from src.errors import ChatAPIError
 import uuid
@@ -24,7 +24,7 @@ chat_client = ChatAPIClient()
 
 ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png", "audio/mpeg", "audio/wav"}
 
-@chat_router.post("/")
+@chat_router.post("/", response_model=ChatResponseSchema, include_in_schema=True)
 async def handle_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: ChatRequestSchema,
@@ -45,7 +45,9 @@ async def handle_chat(
         data={"message": request.message, "user_id": user_id}, 
         token=current_user.access_token
     )
-    return result
+    return ChatResponseSchema(
+        message=result
+    )
 
 
 
@@ -157,11 +159,6 @@ async def file_upload_with_chat(
     )
 
 
-
-
-
-
-
 @chat_router.post("/file/upload")
 async def upload_file(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -178,16 +175,21 @@ async def upload_file(
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
     
-    return await chat_client.proxy_file_upload_service(
+    result = await chat_client.proxy_file_upload_service(
         session=session,
         endpoint="upload",
         file=file,
         token=current_user.access_token
     )
 
+    return ChatResponseSchema(
+        message=result.get("message", "File uploaded successfully"),
+        status=result.get("status", "success")
+    )
 
 
-@chat_router.post("/query/rag")
+
+@chat_router.post("/query/rag", response_model=RagQueryResponse)
 async def query_rag(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: RagQueryRequest,
@@ -214,7 +216,7 @@ async def query_rag(
     )
 
 
-@chat_router.post("/query/direct")
+@chat_router.post("/query/direct", response_model=ChatResponseSchema)
 async def query_direct(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: DirectQueryRequest,
@@ -229,15 +231,19 @@ async def query_direct(
       Returns:
           str: The response from the API.
     """
-    return await chat_client.proxy_direct_query_service(
+    result = await chat_client.proxy_direct_query_service(
         session=session,
         endpoint="query/direct",
         payload=request.model_dump(),
         user=current_user
       )
+    
+    return ChatResponseSchema(
+        message=result,
+    )
 
 
-@chat_router.post("/list_features")
+@chat_router.post("/list_features", response_model=FeatureListResponse)
 async def list_features(
     session: Annotated[AsyncSession, Depends(get_session)],
     current_user: TokenUser = Depends(get_current_user)
@@ -247,8 +253,12 @@ async def list_features(
       Returns:
           dict: The response from the API.
     """
-    return await chat_client.list_features_service(
+    result = await chat_client.list_features_service(
         session=session,
         endpoint="features",
         token=current_user.access_token
-)
+    )
+
+    return FeatureListResponse(
+        features=result.get("features", [])
+    )

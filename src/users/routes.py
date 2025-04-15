@@ -122,7 +122,7 @@ async def verify_email(
 
 
 
-@auth_router.get("/users/me")
+@auth_router.get("/users/me", response_model=TokenUser)
 async def read_users_me(
     current_user: Annotated[User, Depends(get_current_user)]
 ):
@@ -319,8 +319,8 @@ async def validate(request: Request):
             key="access_token",
             value=access_token,
             httponly=True,
-            max_age=3600,  # Cookie expiration time in seconds
-            samesite="lax"  # Adjust based on your cross-site requirements
+            max_age=3600, 
+            samesite="lax"
         )
 
         return response

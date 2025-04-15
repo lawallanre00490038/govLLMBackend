@@ -38,12 +38,13 @@ class FolderUploadCreateModel(BaseModel):
     file_type: str
 
 
-
 class ChatRequestSchema(BaseModel):
     message: str
 
 class ChatResponseSchema(BaseModel):
+    status: Optional[str] = "success"
     message: str
+
 
 class Message(BaseModel):
     content: str
@@ -71,3 +72,23 @@ class RagQueryRequest(BaseModel):
 
 class DirectQueryRequest(BaseModel):
     query: str
+
+
+
+
+
+
+class TopDocument(BaseModel):
+    id: int
+    source: str
+    score: float
+    text: str
+
+
+class RagQueryResponse(BaseModel):
+    answer: str
+    top_documents: List[TopDocument]
+
+
+class FeatureListResponse(BaseModel):
+    features: List[str]
