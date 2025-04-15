@@ -62,7 +62,8 @@ async def login(
             value=access_token,
             httponly=True,
             max_age=3600,
-            samesite="lax"
+            samesite="none",
+            secure=True,
         )
 
         return LoginResponseReadModel(
