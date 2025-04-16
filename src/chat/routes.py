@@ -123,8 +123,6 @@ async def get_grouped_chats(
 
 
 
-
-
 @chat_router.post("/upload_file_with_chat", response_model=ChatResponseSchema, include_in_schema=True)
 async def file_upload_with_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -134,43 +132,41 @@ async def file_upload_with_chat(
     document_id: Optional[str] = Form(None),
     clear_history: bool = Form(False),
     current_user: TokenUser = Depends(get_current_user)
-    
 ):
     """
-      Upload a file to the chat service.
-      Args:
-          file (UploadFile): The file to upload.
-          message (str): The message to send with the file.
-          session_id (str, optional): The session ID. Defaults to None.
-          document_id (str, optional): The document ID. Defaults to None.
-          clear_history (bool, optional): Whether to clear history. Defaults to False.
-      Returns:
-          str: The response from the API.
+    Upload a file to the chat service and save the chat interaction.
     """
+    # Call external file chat upload endpoint
     response = await chat_client.proxy_chat_upload_service(
-      session=session,
-      endpoint="chat/upload",
-      file=file, 
-      message=message, 
-      session_id=session_id, 
-      document_id=document_id, 
-      clear_history=clear_history,
-      token=current_user.access_token
+        session=session,
+        endpoint="chat/upload",
+        file=file,
+        message=message,
+        session_id=session_id,
+        document_id=document_id,
+        clear_history=clear_history,
+        token=current_user.access_token
     )
 
-    # chat_session_id = await chat_client.save_full_chat_session(
-    #     session=session,
-    #     user_id=current_user.id,
-    #     external_session_id=response.get("session_id"), 
-    #     user_message=message,
-    #     ai_response=response.get("response")
-    # )
+    # Get or create the chat session
+    chat_session = await chat_client.get_or_create_chat_session(
+        session=session,
+        user_id=current_user.id,
+        external_session_id=response.get("session_id")
+    )
 
-    # print(f"Chat session ID: {chat_session_id}")
+    # Save the file-related message pair
+    chat_session_id, history = await chat_client.save_full_chat_session(
+        session=session,
+        chat_session=chat_session,
+        user_message=message,
+        ai_response=response.get("response")
+    )
 
     return ChatResponseSchema(
         message=response.get("response"),
-        # session_id=chat_session_id,
+        session_id=chat_session_id,
+        history=history[-2:]
     )
 
 
