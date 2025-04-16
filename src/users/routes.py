@@ -295,7 +295,7 @@ async def validate(request: Request):
             user=user, expires_delta=access_token_expires
         )
 
-        frontend_redirect_url = f"http://localhost:3000/chat"
+        frontend_redirect_url = f"http://localhost:3000/chat?access_token={access_token}"
         
         response =  RedirectResponse(
             url=frontend_redirect_url,
