@@ -54,7 +54,6 @@ async def handle_chat(
 
 
 
-
 @chat_router.post("/stream")
 async def handle_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -120,7 +119,6 @@ async def get_grouped_chats(
             for s in result["sessions"]
         ]
     )
-
 
 
 @chat_router.post("/upload_file_with_chat", response_model=ChatResponseSchema, include_in_schema=True)
@@ -274,7 +272,7 @@ async def query_direct(
             status="success",
             message=result.get("answer"),
             session_id=chat_session_id,
-            history=history[-2:]  # only the latest pair
+            history=history[-2:]
         )
 
     except Exception as e:

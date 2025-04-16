@@ -241,7 +241,6 @@ class ChatAPIClient:
     }
   
 
-
   async def proxy_chat_upload_service(
     self,
     session: AsyncSession,
@@ -411,8 +410,6 @@ class ChatAPIClient:
             result = await session.execute(query)
             messages = result.scalars().all()
 
-            print(f"✅ Retrieved {len(messages)} messages for session {session_id}")
-
             return [
                 {
                     "message_id": str(message.id),
@@ -424,5 +421,4 @@ class ChatAPIClient:
             ]
 
         except SQLAlchemyError as e:
-            print(f"❌ DB error while fetching messages for session {session_id}: {e}")
             raise DatabaseError()

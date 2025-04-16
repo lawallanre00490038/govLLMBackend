@@ -15,6 +15,8 @@ logger.disabled = True
 
 allowed_origins = [
     "http://localhost:3000",
+    "https://govllmfrontend.onrender.com",
+    "https://accounts.google.com", 
 ]
 
 def register_middleware(app: FastAPI):
@@ -39,11 +41,6 @@ def register_middleware(app: FastAPI):
     
 
 
-    app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY)
+    app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY, https_only=True, same_site="none")
     app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True,)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost","127.0.0.1","0.0.0.0", "*.onrender.com","govllmbackend.onrender.com"],)
-
-
-
-
-
