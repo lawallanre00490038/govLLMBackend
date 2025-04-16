@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.errors import UserAlreadyExists, InvalidCredentials, InvalidToken
 from .schemas import LoginResponseReadModel, RegisterResponseReadModel, UserModel, DeleteResponseModel, UserCreateModel, UserLoginModel, TokenUser, VerificationMailSchemaResponse
 from .service import UserService
-from .auth import create_access_token, get_current_user
 from typing import Annotated
 from .auth import create_access_token, get_current_user
 from fastapi.encoders import jsonable_encoder
@@ -61,7 +60,7 @@ async def login(
             key="access_token",
             value=access_token,
             httponly=True,
-            max_age=3600,
+            max_age=18000,
             samesite="none",
             secure=True,
         )
@@ -222,7 +221,7 @@ async def refresh_token(
     current_user: Annotated[User, Depends(get_current_user)]
 ):
     """Refresh the access token for the current user."""
-    access_token_expires = timedelta(minutes=30)
+    access_token_expires = timedelta(minutes=300)
     access_token = create_access_token(
         user=current_user, expires_delta=access_token_expires
     )
@@ -290,7 +289,7 @@ async def validate(request: Request):
         if not user:
             raise HTTPException(status_code=500, detail="User creation failed")
         
-        access_token_expires = timedelta(minutes=30)
+        access_token_expires = timedelta(minutes=300)
         print("The user going into the access token is ", user)
         access_token = create_access_token(
             user=user, expires_delta=access_token_expires
@@ -312,7 +311,7 @@ async def validate(request: Request):
             httponly=True,
             secure=True,     
             samesite="none",
-            max_age=1800,
+            max_age=18000 ,
         )
 
         return response

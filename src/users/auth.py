@@ -20,7 +20,7 @@ from typing import Optional
 
 passwd_context = CryptContext(schemes=["bcrypt"])
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 300
 
 class OptionalOAuth2Scheme(OAuth2PasswordBearer):
     async def __call__(self, request: Request) -> Optional[str]:
