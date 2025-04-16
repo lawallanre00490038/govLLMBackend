@@ -41,10 +41,17 @@ class FolderUploadCreateModel(BaseModel):
 class ChatRequestSchema(BaseModel):
     message: str
 
+
+class ChatTurn(BaseModel):
+    message_id: UUID
+    sender: str
+    content: str
+    created_at: datetime
 class ChatResponseSchema(BaseModel):
     status: Optional[str] = "success"
     message: str
     session_id: Optional[UUID] = None
+    history: Optional[List[ChatTurn]] = None
 
 
 class UploadResponseSchema(BaseModel):

@@ -47,7 +47,8 @@ async def handle_chat(
     )
     return ChatResponseSchema(
         message=result.get("message", "No response"),
-         session_id=result.get("session_id", None),
+        session_id=result.get("session_id", None),
+        history=result.get("chat_history", []),
     )
 
 
