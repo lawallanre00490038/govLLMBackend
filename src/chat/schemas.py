@@ -113,6 +113,7 @@ class RagQueryResponse(BaseModel):
     session_id: Optional[UUID] = None
     answer: str
     top_documents: List[TopDocument]
+    history: Optional[List[ChatTurn]] = None
 
 
 class FeatureListResponse(BaseModel):

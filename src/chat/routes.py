@@ -231,7 +231,7 @@ async def query_rag(
         )
 
         # THIS
-        chat_session_id = await chat_client.save_full_chat_session(
+        chat_session_id, history = await chat_client.save_full_chat_session(
             session=session,
             user_id=current_user.id,
             external_session_id=result.get("session_id", None),
@@ -245,7 +245,8 @@ async def query_rag(
             answer=result.get("answer", "No answer provided"),
             top_documents=[
                 TopDocument(**doc) for doc in result.get("top_documents", [])
-            ]
+            ],
+            history=history
         )
 
     except Exception as e:
@@ -278,7 +279,7 @@ async def query_direct(
 
 
         # THIS
-        chat_session_id = await chat_client.save_full_chat_session(
+        chat_session_id, history = await chat_client.save_full_chat_session(
             session=session,
             user_id=current_user.id,
             external_session_id=result.get("session_id", None),
@@ -291,7 +292,9 @@ async def query_direct(
         return ChatResponseSchema(
             status="success",
             message=result,
-            session_id=chat_session_id
+            session_id=chat_session_id,
+            history=history
+
         )
     except Exception as e:
         print(f"Direct query failed: {str(e)}")
