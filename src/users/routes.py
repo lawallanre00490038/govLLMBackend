@@ -299,9 +299,9 @@ async def validate(request: Request):
         
         response =  RedirectResponse(
             url=frontend_redirect_url,
-            # headers={
-            #     "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; SameSite=None; Max-Age=18000",
-            # },
+            headers={
+                "Set-Cookie": f"access_token={access_token}; Path=/;  SameSite=None; Max-Age=18000",
+            },
             status_code=302,
         )
 
