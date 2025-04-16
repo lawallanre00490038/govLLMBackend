@@ -46,7 +46,10 @@ class ChatAPIClient:
 
         print("Chat API response:", result, session_id)
 
-        return result["response"]
+        return {
+            "message": result.get("response"),
+            "session_id": session_id,
+        }
 
     except Exception as e:
       print(e)
@@ -125,44 +128,52 @@ class ChatAPIClient:
             for sid, msgs in grouped_chats.items()
         ]
     }
-  
-
 
   async def proxy_chat_upload_service(
-    self,
-    session: AsyncSession,
-    endpoint: str,
-    file: UploadFile,
-    message: str,
-    session_id: str,
-    document_id: str,
-    clear_history: bool,
-    token: str,
-
+      self,
+      session: AsyncSession,
+      endpoint: str,
+      file: UploadFile,
+      message: str,
+      session_id: str,
+      document_id: str,
+      clear_history: bool,
+      token: str,
   ):
-    file_bytes = await file.read()
-    files = {
-        "file": (file.filename, file_bytes, file.content_type),
-        "message": (None, message),
-        "clear_history": (None, str(clear_history).lower()),
-    }
-    if session_id:
-        files["session_id"] = (None, session_id)
-    if document_id:
-        files["document_id"] = (None, document_id)
+      file_bytes = await file.read()
+      
+      if not document_id:
+          raise HTTPException(status_code=400, detail="Document ID is required")
 
-    try:
-        response = await self.client.post(
-          f"{self.base_url}/{endpoint}",
-          files=files,
-          headers={"Authorization": f"Bearer {token}"}
-        )
-        response.raise_for_status()
+      files = {
+          "file": (file.filename, file_bytes, file.content_type),
+          "message": (None, message),
+          "clear_history": (None, str(clear_history).lower()),
+          "document_id": (None, document_id),
+      }
 
-        print(f"Chat upload response: {response.json()}")
-        return response.json()
-    except Exception as e:
-       raise ChatUploadError()
+      if session_id:
+          files["session_id"] = (None, session_id)
+
+      files["name"] = (None, file.filename)
+
+      url = f"{self.base_url}/{endpoint}"
+      print(f"Calling external API: {url}")
+
+      try:
+          response = await self.client.post(
+              url,
+              files=files,
+              headers={"Authorization": f"Bearer {token}"}
+          )
+          response.raise_for_status()
+
+          print(f"Chat upload response: {response.json()}")
+          return response.json()
+
+      except Exception as e:
+          print("Error in chat upload:", e)
+          raise ChatUploadError()
 
 
   async def proxy_file_upload_service(
@@ -176,6 +187,8 @@ class ChatAPIClient:
       files = {
           "file": (file.filename, file_bytes, file.content_type),
       }
+
+      print(f"Calling external API: {self.base_url}/{endpoint}")
 
       try:
           timeout = httpx.Timeout(10.0)

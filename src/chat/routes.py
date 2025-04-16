@@ -12,7 +12,7 @@ from uuid import UUID
 from src.db.models import ChatMessage, User
 from fastapi import Form, Request, File, HTTPException
 from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel
-from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema, RagQueryResponse, FeatureListResponse
+from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema, TopDocument, UploadResponseSchema, RagQueryResponse, FeatureListResponse
 from src.users.schemas import TokenUser
 from src.errors import ChatAPIError
 import uuid
@@ -46,7 +46,8 @@ async def handle_chat(
         token=current_user.access_token
     )
     return ChatResponseSchema(
-        message=result
+        message=result.get("message", "No response"),
+         session_id=result.get("session_id", None),
     )
 
 
@@ -146,7 +147,7 @@ async def file_upload_with_chat(
     """
     response = await chat_client.proxy_chat_upload_service(
       session=session,
-      endpoint="/chat/upload",
+      endpoint="chat/upload",
       file=file, 
       message=message, 
       session_id=session_id, 
@@ -154,8 +155,20 @@ async def file_upload_with_chat(
       clear_history=clear_history,
       token=current_user.access_token
     )
+
+    # chat_session_id = await chat_client.save_full_chat_session(
+    #     session=session,
+    #     user_id=current_user.id,
+    #     external_session_id=response.get("session_id"), 
+    #     user_message=message,
+    #     ai_response=response.get("response")
+    # )
+
+    # print(f"Chat session ID: {chat_session_id}")
+
     return ChatResponseSchema(
-        message=response
+        message=response.get("response"),
+        # session_id=chat_session_id,
     )
 
 
@@ -182,9 +195,9 @@ async def upload_file(
         token=current_user.access_token
     )
 
-    return ChatResponseSchema(
+    return UploadResponseSchema(
         message=result.get("message", "File uploaded successfully"),
-        status=result.get("status", "success")
+        status="success",
     )
 
 
@@ -208,12 +221,35 @@ async def query_rag(
       Returns:
           str: The response from the API.
     """
-    return await chat_client.proxy_rag_query_service(
-        session=session,
-        endpoint="query/rag",
-        payload=request.model_dump(),
-        token=current_user.access_token
-    )
+    try:
+        result = await chat_client.proxy_rag_query_service(
+            session=session,
+            endpoint="query/rag",
+            payload=request.model_dump(),
+            token=current_user.access_token
+        )
+
+        # THIS
+        chat_session_id = await chat_client.save_full_chat_session(
+            session=session,
+            user_id=current_user.id,
+            external_session_id=result.get("session_id", None),
+            user_message=request.query,
+            ai_response=result.get("answer")
+        )
+        
+        print(f"Chat session ID: {chat_session_id}")
+        return RagQueryResponse(
+            session_id=chat_session_id,
+            answer=result.get("answer", "No answer provided"),
+            top_documents=[
+                TopDocument(**doc) for doc in result.get("top_documents", [])
+            ]
+        )
+
+    except Exception as e:
+        print(f"RAG query failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @chat_router.post("/query/direct", response_model=ChatResponseSchema)
@@ -231,17 +267,35 @@ async def query_direct(
       Returns:
           str: The response from the API.
     """
-    result = await chat_client.proxy_direct_query_service(
-        session=session,
-        endpoint="query/direct",
-        payload=request.model_dump(),
-        user=current_user
-      )
-    
-    return ChatResponseSchema(
-        message=result,
-    )
+    try:
+        result = await chat_client.proxy_direct_query_service(
+            session=session,
+            endpoint="query/direct",
+            payload=request.model_dump(),
+            user=current_user
+        )
 
+
+        # THIS
+        chat_session_id = await chat_client.save_full_chat_session(
+            session=session,
+            user_id=current_user.id,
+            external_session_id=result.get("session_id", None),
+            user_message=request.query,
+            ai_response=result
+        )
+
+        print(f"Chat session ID: {chat_session_id}")
+        
+        return ChatResponseSchema(
+            status="success",
+            message=result,
+            session_id=chat_session_id
+        )
+    except Exception as e:
+        print(f"Direct query failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 
 @chat_router.post("/list_features", response_model=FeatureListResponse)
 async def list_features(

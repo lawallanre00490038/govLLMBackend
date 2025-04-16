@@ -44,6 +44,12 @@ class ChatRequestSchema(BaseModel):
 class ChatResponseSchema(BaseModel):
     status: Optional[str] = "success"
     message: str
+    session_id: Optional[UUID] = None
+
+
+class UploadResponseSchema(BaseModel):
+    status: Optional[str] = "success"
+    message: str
 
 
 class Message(BaseModel):
@@ -86,6 +92,7 @@ class TopDocument(BaseModel):
 
 
 class RagQueryResponse(BaseModel):
+    session_id: Optional[UUID] = None
     answer: str
     top_documents: List[TopDocument]
 
