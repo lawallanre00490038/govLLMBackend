@@ -295,18 +295,15 @@ async def validate(request: Request):
             user=user, expires_delta=access_token_expires
         )
 
-        frontend_redirect_url = f"http://localhost:3000/chat"
+        frontend_redirect_url = f"http://localhost:3000/chat?access_token={access_token}"
         
         response =  RedirectResponse(
             url=frontend_redirect_url,
             headers={
-                "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=18000",
+                "Set-Cookie": f"access_token={access_token}; Path=/; SameSite=None; Max-Age=18000",
             },
             status_code=302,
         )
-
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
 
         response.set_cookie(
             key="access_token",
