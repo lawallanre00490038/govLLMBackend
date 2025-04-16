@@ -296,11 +296,11 @@ async def validate(request: Request):
         )
 
         frontend_redirect_url = f"http://localhost:3000/chat"
-        # HttpOnly; Secure; SameSite=None;
+        
         response =  RedirectResponse(
             url=frontend_redirect_url,
             headers={
-                "Set-Cookie": f"access_token={access_token}; Path=/;  Max-Age=1800",
+                "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; SameSite=None; Max-Age=1800",
             },
             status_code=302,
         )
