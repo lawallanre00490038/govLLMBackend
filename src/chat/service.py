@@ -284,3 +284,37 @@ class ChatAPIClient:
         return response.json()
     except Exception as e:
         raise ChatAPIError()
+
+
+    #  get_chats_by_session
+  async def get_chats_by_session(
+        self,
+        session_id: uuid.UUID,
+        session: AsyncSession,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve all chat messages for a specific session ID.
+        """
+        try:
+            query = (
+                select(ChatMessage)
+                .where(ChatMessage.session_id == session_id)
+                .order_by(ChatMessage.created_at.asc())
+            )
+            result = await session.execute(query)
+            messages = result.scalars().all()
+
+            print(f"Retrieved {len(messages)} messages for session {session_id}")
+            return [
+                {
+                    "message_id": str(message.id),
+                    "sender": message.sender,
+                    "content": message.content,
+                    "created_at": message.created_at
+                }
+                for message in messages
+            ]
+        
+
+        except SQLAlchemyError as e:
+            raise DatabaseError()

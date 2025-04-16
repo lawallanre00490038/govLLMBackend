@@ -11,12 +11,12 @@ from src.db.main import get_session
 from uuid import UUID
 from src.db.models import ChatMessage, User
 from fastapi import Form, Request, File, HTTPException
-from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel
+from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel, ChatMessageHistory
 from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema, TopDocument, UploadResponseSchema, RagQueryResponse, FeatureListResponse
 from src.users.schemas import TokenUser
 from src.errors import ChatAPIError
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 
 chat_router = APIRouter()
@@ -296,6 +296,24 @@ async def query_direct(
     except Exception as e:
         print(f"Direct query failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+# get all chat for a session id
+@chat_router.get("/session/{session_id}/chats", response_model=List[ChatMessageHistory])
+async def get_chats(
+    session_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current_user: TokenUser = Depends(get_current_user)
+):
+    """
+      Fetch all chat messages for a given session ID.
+      Args:
+          session_id (UUID): The session ID.
+      Returns:
+          ChatResponseSchema: The chat response schema.
+    """
+    result = await chat_client.get_chats_by_session(session_id=session_id, session=session)
+
+    return result
     
 
 @chat_router.post("/list_features", response_model=FeatureListResponse)

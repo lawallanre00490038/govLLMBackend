@@ -43,6 +43,16 @@ class ChatRequestSchema(BaseModel):
     session_id: Optional[UUID] = None
 
 
+
+class ChatMessageHistory(BaseModel):
+    message_id: UUID
+    sender: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
 class ChatTurn(BaseModel):
     message_id: UUID
     sender: str
