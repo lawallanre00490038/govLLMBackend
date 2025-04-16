@@ -305,6 +305,9 @@ async def validate(request: Request):
             status_code=302,
         )
 
+        response.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         response.set_cookie(
             key="access_token",
             value=access_token,
