@@ -300,7 +300,7 @@ async def validate(request: Request):
         response =  RedirectResponse(
             url=frontend_redirect_url,
             headers={
-                "Set-Cookie": f"access_token={access_token}; Path=/;  SameSite=None; Max-Age=18000",
+                "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=18000",
             },
             status_code=302,
         )
