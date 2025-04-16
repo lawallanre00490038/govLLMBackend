@@ -46,7 +46,7 @@ async def handle_chat(
         token=current_user.access_token
     )
     return ChatResponseSchema(
-        message=result.get("message", "No response"),
+        message=result.get("response", "No response"),
         session_id=result.get("session_id", None),
         history=result.get("chat_history", []),
     )

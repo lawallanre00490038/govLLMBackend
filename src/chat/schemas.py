@@ -40,6 +40,7 @@ class FolderUploadCreateModel(BaseModel):
 
 class ChatRequestSchema(BaseModel):
     message: str
+    session_id: Optional[UUID] = None
 
 
 class ChatTurn(BaseModel):
