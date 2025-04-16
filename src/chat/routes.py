@@ -43,7 +43,8 @@ async def handle_chat(
         session=session,
         endpoint="chat", 
         data={"message": request.message, "user_id": user_id}, 
-        token=current_user.access_token
+        token=current_user.access_token,
+        session_id=request.session_id
     )
     return ChatResponseSchema(
         message=result.get("response", "No response"),
@@ -203,25 +204,64 @@ async def upload_file(
 
 
 
+# @chat_router.post("/query/rag", response_model=RagQueryResponse)
+# async def query_rag(
+#     session: Annotated[AsyncSession, Depends(get_session)],
+#     request: RagQueryRequest,
+#     current_user: TokenUser = Depends(get_current_user)
+# ):
+#     """
+#       RAG query endpoint, sends a query to the RAG service and returns the results.
+#       Args:
+#           {
+#             "query": "What is the capital of France?",
+#             "top_k": 10,
+#             "rerank_k": 3,
+#             "feature": "some_feature"
+#           }
+
+#       Returns:
+#           str: The response from the API.
+#     """
+#     try:
+#         result = await chat_client.proxy_rag_query_service(
+#             session=session,
+#             endpoint="query/rag",
+#             payload=request.model_dump(),
+#             token=current_user.access_token
+#         )
+
+#         # THIS
+#         chat_session_id, _ = await chat_client.save_full_chat_session(
+#             session=session,
+#             # user_id=current_user.id,
+#             external_session_id=result.get("session_id", None),
+#             user_message=request.query,
+#             ai_response=result.get("answer")
+#         )
+        
+#         print(f"Chat session ID: {chat_session_id}")
+#         return RagQueryResponse(
+#             session_id=chat_session_id,
+#             answer=result.get("answer", "No answer provided"),
+#             top_documents=[
+#                 TopDocument(**doc) for doc in result.get("top_documents", [])
+#             ],
+#             # history=history
+#         )
+
+#     except Exception as e:
+#         print(f"RAG query failed: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @chat_router.post("/query/rag", response_model=RagQueryResponse)
 async def query_rag(
     session: Annotated[AsyncSession, Depends(get_session)],
     request: RagQueryRequest,
     current_user: TokenUser = Depends(get_current_user)
 ):
-    """
-      RAG query endpoint, sends a query to the RAG service and returns the results.
-      Args:
-          {
-            "query": "What is the capital of France?",
-            "top_k": 10,
-            "rerank_k": 3,
-            "feature": "some_feature"
-          }
-
-      Returns:
-          str: The response from the API.
-    """
     try:
         result = await chat_client.proxy_rag_query_service(
             session=session,
@@ -230,28 +270,36 @@ async def query_rag(
             token=current_user.access_token
         )
 
-        # THIS
-        chat_session_id, history = await chat_client.save_full_chat_session(
+        chat_session = await chat_client.get_or_create_chat_session(
             session=session,
             user_id=current_user.id,
-            external_session_id=result.get("session_id", None),
+            external_session_id=result.get("session_id")
+        )
+
+        chat_session_id, history = await chat_client.save_full_chat_session(
+            session=session,
+            chat_session=chat_session,
             user_message=request.query,
             ai_response=result.get("answer")
         )
-        
-        print(f"Chat session ID: {chat_session_id}")
+
         return RagQueryResponse(
             session_id=chat_session_id,
             answer=result.get("answer", "No answer provided"),
             top_documents=[
                 TopDocument(**doc) for doc in result.get("top_documents", [])
             ],
-            history=history
+            history=history[-2:]
         )
 
     except Exception as e:
         print(f"RAG query failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
 
 
 @chat_router.post("/query/direct", response_model=ChatResponseSchema)
@@ -260,15 +308,6 @@ async def query_direct(
     request: DirectQueryRequest,
     current_user: TokenUser = Depends(get_current_user)
 ):
-    """
-      Direct query endpoint
-      Args:
-          {
-            "query": "What is the capital of France?"
-          }
-      Returns:
-          str: The response from the API.
-    """
     try:
         result = await chat_client.proxy_direct_query_service(
             session=session,
@@ -277,29 +316,79 @@ async def query_direct(
             user=current_user
         )
 
-
-        # THIS
-        chat_session_id, history = await chat_client.save_full_chat_session(
+        # Get or create chat session
+        chat_session = await chat_client.get_or_create_chat_session(
             session=session,
             user_id=current_user.id,
-            external_session_id=result.get("session_id", None),
-            user_message=request.query,
-            ai_response=result
+            external_session_id=result.get("session_id")
         )
 
-        print(f"Chat session ID: {chat_session_id}")
-        
+        # Save conversation
+        chat_session_id, history = await chat_client.save_full_chat_session(
+            session=session,
+            chat_session=chat_session,
+            user_message=request.query,
+            ai_response=result.get("answer")
+        )
+
         return ChatResponseSchema(
             status="success",
-            message=result,
+            message=result.get("answer"),
             session_id=chat_session_id,
-            history=history
-
+            history=history[-2:]  # only the latest pair
         )
+
     except Exception as e:
         print(f"Direct query failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# @chat_router.post("/query/direct", response_model=ChatResponseSchema)
+# async def query_direct(
+#     session: Annotated[AsyncSession, Depends(get_session)],
+#     request: DirectQueryRequest,
+#     current_user: TokenUser = Depends(get_current_user)
+# ):
+#     """
+#       Direct query endpoint
+#       Args:
+#           {
+#             "query": "What is the capital of France?"
+#           }
+#       Returns:
+#           str: The response from the API.
+#     """
+#     try:
+#         result = await chat_client.proxy_direct_query_service(
+#             session=session,
+#             endpoint="query/direct",
+#             payload=request.model_dump(),
+#             user=current_user
+#         )
+
+
+#         # THIS
+#         chat_session_id, history = await chat_client.save_full_chat_session(
+#             session=session,
+#             chat_session=result.get("session_id", None),
+#             user_message=request.query,
+#             ai_response=result
+#         )
+
+#         print(f"Chat session ID: {chat_session_id}")
+        
+#         return ChatResponseSchema(
+#             status="success",
+#             message=result,
+#             session_id=chat_session_id,
+#             history=history[-2:]  # Return the last two messages
+
+#         )
+#     except Exception as e:
+#         print(f"Direct query failed: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
     
+
 # get all chat for a session id
 @chat_router.get("/session/{session_id}/chats", response_model=List[ChatMessageHistory])
 async def get_chats(
