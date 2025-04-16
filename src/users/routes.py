@@ -299,14 +299,9 @@ async def validate(request: Request):
         
         response =  RedirectResponse(
             url=frontend_redirect_url,
-            headers={
-                "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; SameSite=None; Max-Age=18000",
-                "Location": frontend_redirect_url,
-                "Access-Control-Allow-Origin": "http://localhost:3000",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Headers": "Content-Type",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            },
+            # headers={
+            #     "Set-Cookie": f"access_token={access_token}; Path=/; HttpOnly; SameSite=None; Max-Age=18000",
+            # },
             status_code=302,
         )
 
@@ -324,3 +319,11 @@ async def validate(request: Request):
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail=f"Internal Server Error, {e}")
+
+
+
+    #   "Location": frontend_redirect_url,
+    #             "Access-Control-Allow-Origin": "http://localhost:3000",
+    #             "Access-Control-Allow-Credentials": "true",
+    #             "Access-Control-Allow-Headers": "Content-Type",
+    #             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
