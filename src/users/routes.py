@@ -140,7 +140,7 @@ async def token(
     request: Request,
 ):
     """
-        This is responsible for exchanging the code for an access token and validating the token.
+        This is responsible for exchanging the google code for an access token and validating the token.
         Send the user data to the user and sets access token in cookies.
     """
     print("The code is", form_data.code)
