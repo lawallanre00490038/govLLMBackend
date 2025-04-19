@@ -132,7 +132,7 @@ async def read_users_me(
     return current_user
 
 
-@auth_router.post("/token", include_in_schema=True)
+@auth_router.post("/google-token", include_in_schema=True)
 async def token(
     form_data: GetTokenRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
