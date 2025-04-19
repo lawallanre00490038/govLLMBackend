@@ -103,3 +103,7 @@ class GetTokenResponse(BaseModel):
     data: TokenData
 
 
+
+
+class GetTokenRequest(BaseModel):
+    code: str

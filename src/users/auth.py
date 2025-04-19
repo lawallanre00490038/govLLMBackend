@@ -125,7 +125,7 @@ def verify_email_response(user, access_token: str, response):
         key="access_token",
         value=access_token,
         httponly=True,
-        max_age=3600,  # Cookie expiration time in seconds
+        max_age=18000,
         samesite="none",
         secure=True,
     )

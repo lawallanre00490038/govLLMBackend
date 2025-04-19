@@ -78,74 +78,14 @@ class ChatAPIClient:
             print(f"[ChatAPI] Error during chat request: {e}")
             raise ChatAPIError()
         
-#   async def save_full_chat_session(
-#         self, 
-#         session: AsyncSession, 
-#         chat_session: Optional[ChatSession] = None,
-#         user_id: Optional[uuid.UUID] = None,
-#         external_session_id: Optional[str] = None,
-#         user_message: str = "", 
-#         ai_response: str = ""
-#     ):
-#         try:
-#             # Determine the session to use
-#             if chat_session:
-#                 session_id = chat_session.id
-#             else:
-#                 if not user_id:
-#                     raise ValueError("user_id is required if chat_session is not provided")
-
-#                 # Try to find existing session by external_session_id
-#                 query = select(ChatSession).where(ChatSession.external_session_id == external_session_id)
-#                 result = await session.execute(query)
-#                 chat_session = result.scalar_one_or_none()
-
-#                 if not chat_session:
-#                     # Create new ChatSession
-#                     chat_session = ChatSession(
-#                         user_id=user_id,
-#                         external_session_id=external_session_id
-#                     )
-#                     session.add(chat_session)
-#                     await session.flush()
-
-#                 session_id = chat_session.id
-
-#             # Save user message
-#             user_msg = ChatMessage(
-#                 session_id=session_id,
-#                 sender="user",
-#                 content=user_message
-#             )
-#             session.add(user_msg)
-
-#             # Save AI response
-#             ai_msg = ChatMessage(
-#                 session_id=session_id,
-#                 sender="ai",
-#                 content=ai_response
-#             )
-#             session.add(ai_msg)
-
-#             await session.commit()
-#             print(f"✅ Saved session {session_id} with user & AI messages.")
-
-#             # Return full updated history
-#             chat_history = await self._get_chat_history(session_id, session)
-#             return session_id, chat_history
-
-#         except Exception as e:
-#             await session.rollback()
-#             print(f"❌ Error saving session: {e}")
-#             raise ChatSessionSaveError()
 
   async def save_full_chat_session(
-    self, 
-    session: AsyncSession, 
-    chat_session: ChatSession, 
-    user_message: str, 
-    ai_response: str
-):
+        self, 
+        session: AsyncSession, 
+        chat_session: ChatSession, 
+        user_message: str, 
+        ai_response: str
+    ):
     try:
         # Save user message
         user_msg = ChatMessage(
@@ -189,7 +129,7 @@ class ChatAPIClient:
       history = []
       for message in messages:
           history.append({
-              "message_id": str(message.id),  # Convert UUID to string
+              "message_id": str(message.id),
               "sender": message.sender,
               "content": message.content,
               "created_at": message.created_at
@@ -355,7 +295,7 @@ class ChatAPIClient:
         external_session_id: Optional[str] = None
     ) -> ChatSession:
         """
-        Retrieves a chat session by external_session_id or creates a new one.
+            Retrieves a chat session by external_session_id or creates a new one.
         """
         if external_session_id:
             result = await session.execute(
@@ -364,6 +304,8 @@ class ChatAPIClient:
             chat_session = result.scalar_one_or_none()
             if chat_session:
                 return chat_session
+            # else:
+            #     raise NoChatSessionsFound()
 
         # Create new session
         chat_session = ChatSession(

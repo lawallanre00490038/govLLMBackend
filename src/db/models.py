@@ -23,11 +23,11 @@ class ChatSession(SQLModel, table=True):
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="chat_sessions")
 
-    external_session_id: Optional[str] = Field(default=None)  # Save the API session_id
+    external_session_id: Optional[str] = Field(default=None)
     created_at: datetime = Field(sa_column=Column(DateTime, default=datetime.utcnow))
     updated_at: datetime = Field(sa_column=Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow))
 
-    messages: List["ChatMessage"] = Relationship(back_populates="session")  # Add message relationship
+    messages: List["ChatMessage"] = Relationship(back_populates="session")
 
 
 class ChatMessage(SQLModel, table=True):

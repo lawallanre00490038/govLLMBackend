@@ -5,7 +5,7 @@ from src.db.main import get_session
 from src.db.models import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.errors import UserAlreadyExists, InvalidCredentials, InvalidToken
-from .schemas import LoginResponseReadModel, RegisterResponseReadModel, UserModel, DeleteResponseModel, UserCreateModel, UserLoginModel, TokenUser, VerificationMailSchemaResponse
+from .schemas import LoginResponseReadModel, GetTokenRequest, RegisterResponseReadModel, UserModel, DeleteResponseModel, UserCreateModel, UserLoginModel, TokenUser, VerificationMailSchemaResponse
 from .service import UserService
 from typing import Annotated
 from .auth import create_access_token, get_current_user
@@ -19,6 +19,8 @@ from datetime import timedelta
 from google.oauth2 import id_token
 from google.auth.transport import requests
 import httpx
+import jwt
+from typing import Optional
 from starlette.requests import Request
 
 auth_router = APIRouter()
@@ -43,7 +45,7 @@ async def register_user(
         raise UserAlreadyExists()
 
 
-@auth_router.post("/login", response_model=LoginResponseReadModel)
+@auth_router.post("/signin", response_model=LoginResponseReadModel)
 async def login(
     form_data: UserLoginModel,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -130,88 +132,30 @@ async def read_users_me(
     return current_user
 
 
-
-@auth_router.get("/signin/google/")
-async def google_login(request: Request):
-    """
-        Redirect the user to Google login page.
-        if authenticated, return success else raise a 400 error.
-    """
-    print("The request is", request.headers.get("Referer"))
-    redirect_uri = request.url_for('auth')
-
-    print("The redirect uri is", redirect_uri)
-    print("The google auth url is", settings.GOOGLE_CLIENT_ID)
-    
-    google_auth_url = (
-        f"https://accounts.google.com/o/oauth2/auth"
-        f"?client_id={settings.GOOGLE_CLIENT_ID}"
-        f"&redirect_uri={redirect_uri}"
-        f"&response_type=code"
-        f"&scope=openid email profile"
-        f"&access_type=offline"
-        f"&prompt=consent"
-    )
-
-    return RedirectResponse(url=google_auth_url)
-
-@auth_router.get("/auth", include_in_schema=False)
-async def auth(code: str, request: Request):
+@auth_router.post("/token", include_in_schema=True)
+async def token(
+    form_data: GetTokenRequest,
+    response: Response,
+    request: Request,
+):
     """
         This routes is automatically called by the google route
         Handle the Google sign/signup callback.
         Responsible for exchanging the code for an access token and validating the token.
         Send the user data to the user.
     """
-    token_request_uri = "https://oauth2.googleapis.com/token"
-    print("The next url: ", request.url_for('auth'))
-    data = {
-        'code': code,
-        'client_id': settings.GOOGLE_CLIENT_ID,
-        'client_secret': settings.GOOGLE_CLIENT_SECRET,
-        'redirect_uri': request.url_for('auth'),
-        'grant_type': 'authorization_code',
-    }
+    print("The code is", form_data.code)
+    tok = form_data.code
 
+    decoded_token = jwt.decode(tok, options={"verify_signature": False})
+    print("The decoded token is", decoded_token)
 
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    async with httpx.AsyncClient() as client:
-        response = await client.post(token_request_uri, data=data, headers=headers)
-        response.raise_for_status()
-        token_response = response.json()
+    request.session["user_data"] = decoded_token 
+    request.state.session = await get_session().__anext__() 
 
-    id_token_value = token_response.get('id_token')
-    if not id_token_value:
-        raise HTTPException(status_code=400, detail="Missing id_token in response.")
+    response = await validate(request, response)
 
-    try:
-        id_info = id_token.verify_oauth2_token(
-            id_token_value, requests.Request(), 
-            settings.GOOGLE_CLIENT_ID,
-            clock_skew_in_seconds=2
-        )
-
-        payload: GooglePayload = {
-            "sub": id_info.get('sub'),
-            "email": id_info.get('email'),
-            "name": id_info.get('name'),
-            "picture": id_info.get('picture'),
-            "is_verified": id_info.get('email_verified'),
-            "verification_token": str(uuid.uuid4())
-        }
-
-        request.session["user_data"] = payload 
-        request.state.session = await get_session().__anext__() 
-        print("The payload is", payload)
-        response = await validate(request)
-        return response
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid id_token: {str(e)}")
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-
+    return response
 
 
 
@@ -263,7 +207,7 @@ async def delete_user(
 
 
 
-async def validate(request: Request):
+async def validate(request: Request, response: Optional[Response] = None):
     user_data = request.session.get('user_data')
     print("The user data is from the google payload", user_data)
     user_service = UserService()
@@ -295,35 +239,10 @@ async def validate(request: Request):
             user=user, expires_delta=access_token_expires
         )
 
-        frontend_redirect_url = f"http://localhost:3000/chat?access_token={access_token}"
+        result = verify_email_response(user, access_token, response)
         
-        response =  RedirectResponse(
-            url=frontend_redirect_url,
-            headers={
-                "Set-Cookie": f"access_token={access_token}; Path=/; SameSite=None; Max-Age=18000",
-            },
-            status_code=302,
-        )
-
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            secure=True,   
-            samesite="none",
-            max_age=18000 ,
-        )
-
-        return response
+        return result
 
     except Exception as e:
         print("The error is", e)
         raise HTTPException(status_code=500, detail=f"Internal Server Error, {e}")
-
-
-
-    #   "Location": frontend_redirect_url,
-    #             "Access-Control-Allow-Origin": "http://localhost:3000",
-    #             "Access-Control-Allow-Credentials": "true",
-    #             "Access-Control-Allow-Headers": "Content-Type",
-    #             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
