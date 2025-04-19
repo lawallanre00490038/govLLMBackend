@@ -135,25 +135,23 @@ async def read_users_me(
 @auth_router.post("/token", include_in_schema=True)
 async def token(
     form_data: GetTokenRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
     response: Response,
     request: Request,
 ):
     """
-        This routes is automatically called by the google route
-        Handle the Google sign/signup callback.
-        Responsible for exchanging the code for an access token and validating the token.
-        Send the user data to the user.
+        This is responsible for exchanging the code for an access token and validating the token.
+        Send the user data to the user and sets access token in cookies.
     """
     print("The code is", form_data.code)
     tok = form_data.code
 
-    decoded_token = jwt.decode(tok, options={"verify_signature": False})
-    print("The decoded token is", decoded_token)
+    user_data = jwt.decode(tok, options={"verify_signature": False})
+    print("The decoded token is", user_data)
 
-    request.session["user_data"] = decoded_token 
-    request.state.session = await get_session().__anext__() 
+    request.session["user_data"] = user_data 
 
-    response = await validate(request, response)
+    response = await validate(user_data, request, response, session)
 
     return response
 
@@ -207,11 +205,10 @@ async def delete_user(
 
 
 
-async def validate(request: Request, response: Optional[Response] = None):
-    user_data = request.session.get('user_data')
-    print("The user data is from the google payload", user_data)
+async def validate(user_data: dict, request: Request, response: Optional[Response] = None, session: Optional[AsyncSession] = None):
+
+    print("The user data is from the decoded google token", user_data)
     user_service = UserService()
-    session: AsyncSession = request.state.session
 
     email = user_data["email"]
     print("The email is", email)
