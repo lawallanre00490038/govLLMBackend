@@ -49,7 +49,7 @@ class ChatAPIClient:
                 )
                 chat_session = session_result.scalar_one_or_none()
                 if not chat_session:
-                    raise HTTPException(status_code=404, detail="Session not found")
+                    raise NoChatSessionsFound()
             else:
                 # New session
                 chat_session = ChatSession(
@@ -180,7 +180,6 @@ class ChatAPIClient:
         ]
     }
   
-
   async def proxy_chat_upload_service(
     self,
     session: AsyncSession,
@@ -191,31 +190,34 @@ class ChatAPIClient:
     document_id: str,
     clear_history: bool,
     token: str,
-
-  ):
+):
     file_bytes = await file.read()
+
     files = {
         "file": (file.filename, file_bytes, file.content_type),
         "message": (None, message),
         "clear_history": (None, str(clear_history).lower()),
+        "session_id": (None, session_id or ""),
+        "document_id": (None, document_id or ""),
     }
-    if session_id:
-        files["session_id"] = (None, session_id)
-    if document_id:
-        files["document_id"] = (None, document_id)
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "accept": "application/json",
+    }
 
     try:
         response = await self.client.post(
-          f"{self.base_url}/{endpoint}",
-          files=files,
-          headers={"Authorization": f"Bearer {token}"}
+            f"{self.base_url}/{endpoint}",
+            files=files,
+            headers=headers
         )
         response.raise_for_status()
-
         print(f"Chat upload response: {response.json()}")
         return response.json()
     except Exception as e:
-       raise ChatUploadError()
+        print(f"Upload error: {e}")
+        raise ChatUploadError()
 
 
   async def proxy_file_upload_service(

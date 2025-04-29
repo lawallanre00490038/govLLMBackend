@@ -10,19 +10,36 @@ from typing import List
 
 
 class UserCreateModel(BaseModel):
+    full_name: str
     email: EmailStr
     password: str
-
-    class Config:
-        from_attributes = True
+    
+    model_config = {
+         "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "full_name": "John Doe",
+                "email": "johndoe123@co.com",
+                "password": "testpass123",
+            }
+        }
+    }
+    
 
 # User login model
 class UserLoginModel(BaseModel):
     email: EmailStr
     password: str
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "email": "johndoe123@co.com",
+                "password": "testpass123",
+            }
+        }
+    }
 
 # User response model
 class UserModel(BaseModel):
@@ -68,6 +85,7 @@ class TokenData(BaseModel):
     username: str | None = None
 
 class TokenUser(BaseModel):
+    full_name: str
     email: str
     id: UUID
     is_verified: bool
@@ -84,6 +102,28 @@ class VerificationMailSchemaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ForgotPasswordModel(BaseModel):
+    email: EmailStr
+
+class ResetPasswordModel(BaseModel):
+    password: str
+
+class ResetPasswordSchemaResponseModel(BaseModel):
+    status: bool
+    message: str
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "status": True,
+                "message": "Password reset email sent successfully."
+            }
+        }
+    }
+
+
     
 class GooglePayload(BaseModel):
     sub: Optional[Any] = None

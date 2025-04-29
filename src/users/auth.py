@@ -6,7 +6,7 @@ from itsdangerous import URLSafeTimedSerializer
 import jwt
 from passlib.context import CryptContext
 from src.config import settings
-from src.errors import UserAlreadyExists, InvalidCredentials, AccountNotVerified, UserNotFound
+from src.errors import UserAlreadyExists, InvalidCredentials, AccountNotVerified, UserNotFound, NotAuthenticated
 from fastapi import Request, Response, HTTPException
 import secrets
 from fastapi.security import OAuth2PasswordBearer
@@ -75,13 +75,21 @@ def decode_url_safe_token(token:str):
 
 
 def create_access_token(user, expires_delta: timedelta | None = None):
-    to_encode = {
-        "sub": user.email,
-        "id": str(user.id),
-        "is_verified": user.is_verified,
-        "exp": datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    }
-    return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    try:
+        if not user.is_verified:
+            raise AccountNotVerified()
+        to_encode = {
+            
+            "sub": user.email,
+            "id": str(user.id),
+            "is_verified": user.is_verified,
+            "full_name": user.full_name,
+            "exp": datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+        }
+        return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    except Exception as e:
+        logging.error(f"Error creating access token: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def get_current_user(
@@ -92,21 +100,19 @@ async def get_current_user(
     access_token = token or request.cookies.get("access_token")
 
     if not access_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise NotAuthenticated()
 
     try:
         payload = jwt.decode(access_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         email = payload.get("sub")
         user_id = payload.get("id")
+        full_name = payload.get("full_name")
 
         if not email or not user_id:
             raise HTTPException(status_code=401, detail="Token missing fields")
 
         return TokenUser(
+            full_name=full_name,
             email=email,
             id=user_id,
             is_verified=payload.get("is_verified"),

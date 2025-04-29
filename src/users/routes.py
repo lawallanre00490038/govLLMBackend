@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from src.db.main import get_session
 from src.db.models import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.errors import UserAlreadyExists, InvalidCredentials, InvalidToken
-from .schemas import LoginResponseReadModel, GetTokenRequest, RegisterResponseReadModel, UserModel, DeleteResponseModel, UserCreateModel, UserLoginModel, TokenUser, VerificationMailSchemaResponse
+from src.errors import UserAlreadyExists, InvalidCredentials, InvalidToken, ResetPasswordFailed
+from .schemas import LoginResponseReadModel, ResetPasswordSchemaResponseModel, ForgotPasswordModel, ResetPasswordModel, GetTokenRequest, RegisterResponseReadModel, UserModel, DeleteResponseModel, UserCreateModel, UserLoginModel, TokenUser, VerificationMailSchemaResponse
 from .service import UserService
 from typing import Annotated
 from .auth import create_access_token, get_current_user
@@ -39,7 +39,7 @@ async def register_user(
             status=True,
             message="User created successfully. Please check your mail to verify your account.",
             verification_token=new_user.verification_token,
-            data=jsonable_encoder(new_user)
+            data=new_user
         )
     except UserAlreadyExists:
         raise UserAlreadyExists()
@@ -89,44 +89,31 @@ async def verify_email(
     
     # Initialize UserService instance
     user_service = UserService()
+
+    user = await user_service.verify_token(token, session)
+    print("The user from the verify email function is", user)
     
-    try:
-        # Retrieve user based on the verification token
-        user = await user_service.verify_token(token, session)
-        print("The user from the verify email function is", user)
-        
-        if not user:
-            raise InvalidToken()
-        
-        # Update user verification status
-        user.is_verified = True
-        user.verification_token = None
-        
-        # Commit changes to the database
-        await session.commit()
-        await session.refresh(user)
-        
-        # Generate access token for the verified user
-        access_token = create_access_token(user=user)
-        
-        # Prepare response
-        response = verify_email_response(user, access_token, response)
-        
-        return response
+    # Update user verification status
+    user.is_verified = True
+    user.verification_token = None
     
-    except Exception as e:
-        print("The error is", e)
-        # Handle generic exceptions with a meaningful error message
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to verify email. Please try again."
-        )
+    # Commit changes to the database
+    await session.commit()
+    await session.refresh(user)
+    
+    # Generate access token for the verified user
+    access_token = create_access_token(user=user)
+    
+    # Prepare response
+    response = verify_email_response(user, access_token, response)
+    
+    return response
 
 
 
 @auth_router.get("/users/me", response_model=TokenUser)
 async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_user)]
+    current_user: Annotated[TokenUser, Depends(get_current_user)]
 ):
     """Get details of the current user."""
     return current_user
@@ -163,11 +150,9 @@ async def refresh_token(
     current_user: Annotated[User, Depends(get_current_user)]
 ):
     """Refresh the access token for the current user."""
-    access_token_expires = timedelta(minutes=300)
-    access_token = create_access_token(
-        user=current_user, expires_delta=access_token_expires
-    )
+    access_token = create_access_token(user=current_user)
     return TokenUser(
+        full_name=current_user.full_name,
         email=current_user.email,
         id=current_user.id,
         is_verified=current_user.is_verified,
@@ -202,6 +187,64 @@ async def delete_user(
         status=True,
         message="User deleted successfully"
     )
+
+
+# Log out route
+@auth_router.post("/logout", response_model=DeleteResponseModel)
+async def logout(
+    response: Response,
+    current_user: Annotated[TokenUser, Depends(get_current_user)]
+):
+    """Logout user by clearing the access token cookie."""
+    response.delete_cookie(key="access_token")
+    return DeleteResponseModel(
+        status=True,
+        message="Logout successful"
+    )
+
+
+
+
+# Reset password
+@auth_router.post("/forgot-password", response_model=ResetPasswordSchemaResponseModel)
+async def forgot_password(
+    payload: ForgotPasswordModel,
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Reset the password for the user."""
+    user_service = UserService()
+    response = await user_service.forgot_password(payload, session)
+    return response
+
+
+@auth_router.post("/reset-password", response_model=ResetPasswordSchemaResponseModel, include_in_schema=False)
+async def reset_password_redirect(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    payload: ResetPasswordModel,
+    token: str = Query(..., description="Verification token from email"),
+):
+    """Verify user's email using the provided token."""
+    
+    # Initialize UserService instance
+    user_service = UserService()
+
+    user = await user_service.verify_token(token, session)
+    
+    if not user:
+        raise InvalidToken()
+    
+    # Update user verification status
+    user.is_verified = True
+    user.verification_token = None
+    
+    # Commit changes to the database
+    await session.commit()
+    await session.refresh(user)
+    
+    #  Reset the password
+    response = await user_service.reset_password(user, payload, session)
+            
+    return response
 
 
 

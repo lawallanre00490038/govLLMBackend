@@ -3,10 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Optional
 from sqlmodel import select, Session
 from src.db.models import User
-from src.errors import UserAlreadyExists, InvalidCredentials, EmailAlreadyVerified
-from .schemas import UserCreateModel, VerificationMailSchemaResponse
+from src.errors import UserAlreadyExists, InvalidCredentials, EmailAlreadyVerified, ResetPasswordFailed, AccountNotVerified
+from .schemas import UserCreateModel, VerificationMailSchemaResponse, ResetPasswordSchemaResponseModel, ResetPasswordModel, ForgotPasswordModel
 from .auth import generate_passwd_hash, verify_password
-from .email import send_verification_email
+from .email import send_verification_email, send_reset_password_email
 import uuid
 
 class UserService:
@@ -34,6 +34,7 @@ class UserService:
             hash_password = generate_passwd_hash(user_data.password)
 
             new_user = User(
+                full_name=user_data.full_name,
                 email=user_data.email,
                 password=hash_password,
                 is_verified=True if is_google else False,
@@ -66,6 +67,8 @@ class UserService:
         print("The user from the authenticate function is: ", user)
         if not user or not verify_password(password, user.password):
             raise InvalidCredentials()
+        if not user.is_verified:
+            raise AccountNotVerified()
         await session.refresh(user)
         return user
 
@@ -115,3 +118,46 @@ class UserService:
         except Exception as e:
             await session.rollback()
             raise e
+
+
+     
+    async def reset_password(self, user: User, payload: ResetPasswordModel, session: AsyncSession) -> ResetPasswordSchemaResponseModel:
+        """Reset the user's password"""
+        try:
+            # Update the user's password
+            user.password = generate_passwd_hash(payload.password)
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            
+            return ResetPasswordSchemaResponseModel(
+                status=True,
+                message="Password reset successfully."
+            )
+        except Exception as e:
+            await session.rollback()
+            raise ResetPasswordFailed()
+        
+
+    # reset password
+    async def forgot_password(self, payload: ForgotPasswordModel, session: AsyncSession) -> ResetPasswordSchemaResponseModel:
+        """Initiate a password reset process by sending an email with a reset link."""
+        user = await self.get_user_by_email(payload.email, session)
+        if not user:
+            raise InvalidCredentials()
+
+        # Generate and assign a new reset token
+        reset_token = str(uuid.uuid4())
+        user.verification_token = reset_token
+
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        # Send the reset password email
+        send_reset_password_email(user.email, reset_token)
+
+        return ResetPasswordSchemaResponseModel(
+            status=True,
+            message="A password reset link has been sent to your email."
+        )

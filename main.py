@@ -13,6 +13,14 @@ from src.chat.upload.routes import folder_router
 # logging.basicConfig()    
 # logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
 
+import logging
+import httpx
+
+httpx_logger = logging.getLogger("httpx")
+httpx_logger.setLevel(logging.DEBUG)
+httpx_logger.addHandler(logging.StreamHandler())
+
+
 version = "v1"
 
 description = """

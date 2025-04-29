@@ -47,11 +47,24 @@ class UserAlreadyExists(GovLLMiner):
     def __init__(self, message: str = "User with email already exists"):
         super().__init__(message=message, error_code="user_exists")
 
+class NotAuthenticated(GovLLMiner):
+    """User has not been authenticated"""
+
+    def __init__(self, message: str = "User not authenticated"):
+        super().__init__(message=message, error_code="not_authenticated")
+    
+
 
 class EmailAlreadyVerified(GovLLMiner):
     """User has provided an email for a user who has already been verified."""
     def __init__(self, message: str = "Email already verified"):
         super().__init__(message=message, error_code="email_already_verified")
+
+
+class ResetPasswordFailed(GovLLMiner):
+    """User has provided an email for a user who has already been verified."""
+    def __init__(self, message: str = "Reset password failed"):
+        super().__init__(message=message, error_code="reset_password_failed")
 
 
 # ========================================== Chat API & Session Errors
@@ -197,6 +210,17 @@ def register_all_errors(app: FastAPI):
     )
 
     app.add_exception_handler(
+        NotAuthenticated,
+        create_exception_handler(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            initial_detail={
+                "message": "User not authenticated",
+                "error_code": "not_authenticated",
+            },
+        ),
+    )
+
+    app.add_exception_handler(
         InvalidCredentials,
         create_exception_handler(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -305,6 +329,17 @@ def register_all_errors(app: FastAPI):
             },
         ),
         )
+    
+    app.add_exception_handler(
+        ResetPasswordFailed,
+        create_exception_handler(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            initial_detail={
+                "message": "Reset password failed",
+                "error_code": "reset_password_failed",
+            },
+        ),
+    )
 
     app.add_exception_handler(
         NoChatSessionsFound,

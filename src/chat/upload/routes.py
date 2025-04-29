@@ -34,7 +34,6 @@ async def upload_local_folder(
     """
     Upload files, validate their types, and process them with the API.
     """
-
     return await upload_api.upload_files(
         endpoint="upload",
         files=files,
