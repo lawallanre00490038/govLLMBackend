@@ -135,13 +135,20 @@ async def file_upload_with_chat(
     """
     Upload a file to the chat service and save the chat interaction.
     """
+
+    if session_id:
+        external_session_id = await chat_client.replace_session_id_with_external_id(
+            session_id=session_id,
+            session=session
+        )
+
     # Call external file chat upload endpoint
     response = await chat_client.proxy_chat_upload_service(
         session=session,
         endpoint="chat/upload",
         file=file,
         message=message,
-        session_id=session_id,
+        session_id=external_session_id,
         document_id=document_id,
         clear_history=clear_history,
         token=current_user.access_token

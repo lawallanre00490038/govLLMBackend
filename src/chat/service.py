@@ -28,8 +28,13 @@ class ChatAPIClient:
         token: str,
         session_id: Optional[uuid.UUID] = None
     ):
+        if session_id:
+            data["session_id"] = await self.replace_session_id_with_external_id(
+                session_id=session_id,
+                session=session
+            )
+
         try:
-            # Call external API
             response = await self.client.post(
                 f"{self.base_url}/{endpoint}",
                 json=data,
@@ -135,6 +140,29 @@ class ChatAPIClient:
               "created_at": message.created_at
           })
       return history
+  
+  async def replace_session_id_with_external_id(
+        self,
+        session_id: uuid.UUID,
+        session: AsyncSession,
+    ):
+        """
+        Replace the session ID with an external session ID.
+        """
+        
+        try:
+            result = await session.execute(
+                select(ChatSession.external_session_id).where(ChatSession.id == session_id)
+            )
+            external_session_id_row = result.scalar_one_or_none()
+            if external_session_id_row is None:
+                raise HTTPException(status_code=404, detail="Chat session not found")
+            external_session_id = str(external_session_id_row)
+            print("External session ID:\n\n", external_session_id)
+            return external_session_id
+        except Exception as e:
+            raise DatabaseError(message=f"Failed to retrieve session mapping: {e}")
+
 
 
   async def get_chats_by_user_grouped(
