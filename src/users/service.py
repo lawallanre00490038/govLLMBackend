@@ -6,7 +6,7 @@ from src.db.models import User
 from src.errors import UserAlreadyExists, InvalidCredentials, EmailAlreadyVerified, ResetPasswordFailed, AccountNotVerified
 from .schemas import UserCreateModel, VerificationMailSchemaResponse, ResetPasswordSchemaResponseModel, ResetPasswordModel, ForgotPasswordModel
 from .auth import generate_passwd_hash, verify_password
-from .email import send_verification_email, send_reset_password_email
+from .email import send_verification_email, send_reset_password_email, send_verification_email_resend, send_reset_password_email_resend
 import uuid
 
 class UserService:
@@ -45,7 +45,8 @@ class UserService:
             await session.commit()
 
             if not is_google:
-                send_verification_email(new_user.email, verification_token)
+                # send_verification_email(new_user.email, verification_token)
+                send_verification_email_resend(new_user.email, verification_token)
 
             return new_user
         except Exception as e:
@@ -107,7 +108,8 @@ class UserService:
                 user.verification_token = verification_token
                 session.add(user)
                 await session.commit()
-                send_verification_email(user.email, verification_token)
+                # send_verification_email(user.email, verification_token)
+                send_verification_email_resend(user.email, verification_token)
             else:
                 raise InvalidCredentials()
             return VerificationMailSchemaResponse(
@@ -155,7 +157,7 @@ class UserService:
         await session.refresh(user)
 
         # Send the reset password email
-        send_reset_password_email(user.email, reset_token)
+        send_reset_password_email_resend(user.email, reset_token)
 
         return ResetPasswordSchemaResponseModel(
             status=True,

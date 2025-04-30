@@ -10,7 +10,7 @@ from typing import List
 
 
 class UserCreateModel(BaseModel):
-    full_name: str
+    full_name: Optional[str] = None
     email: EmailStr
     password: str
     
@@ -85,11 +85,11 @@ class TokenData(BaseModel):
     username: str | None = None
 
 class TokenUser(BaseModel):
-    full_name: str
+    full_name: Optional[str] = None
     email: str
     id: UUID
     is_verified: bool
-    access_token: str
+    access_token: Optional[str] = None
     token_type: Optional[str] = "bearer"
 
     class Config:

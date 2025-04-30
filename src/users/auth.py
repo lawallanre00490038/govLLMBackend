@@ -83,7 +83,7 @@ def create_access_token(user, expires_delta: timedelta | None = None):
             "sub": user.email,
             "id": str(user.id),
             "is_verified": user.is_verified,
-            "full_name": user.full_name,
+            "full_name": user.full_name if user.full_name else None,
             "exp": datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
         }
         return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
@@ -106,13 +106,13 @@ async def get_current_user(
         payload = jwt.decode(access_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         email = payload.get("sub")
         user_id = payload.get("id")
-        full_name = payload.get("full_name")
+        full_name = payload.get("full_name") if payload.get("full_name") else None
 
         if not email or not user_id:
             raise HTTPException(status_code=401, detail="Token missing fields")
 
         return TokenUser(
-            full_name=full_name,
+            full_name=full_name if full_name else None,
             email=email,
             id=user_id,
             is_verified=payload.get("is_verified"),
