@@ -6,10 +6,10 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import json, traceback
 from starlette.responses import Response
 from colorlog import ColoredFormatter
-
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
+
 
 allowed_origins = [
     "http://localhost:3000",
