@@ -30,15 +30,17 @@ class UserService:
         print("The data coming in: ", user_data)
         
         try:
-            verification_token = str(uuid.uuid4()) 
+            verification_token = str(uuid.uuid4())
             hash_password = generate_passwd_hash(user_data.password)
+
+            print("The user full name is: ", user_data.full_name)
 
             new_user = User(
                 full_name=user_data.full_name,
                 email=user_data.email,
                 password=hash_password,
                 is_verified=True if is_google else False,
-                verification_token=verification_token
+                verification_token=verification_token if not is_google else None
             )
 
             session.add(new_user)

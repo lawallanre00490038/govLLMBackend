@@ -45,8 +45,6 @@ def send_verification_email(to_email: str, verification_token: str):
         print(f"Exception when calling SMTPApi->send_transac_email: {e}\n")
 
 
-
-
 def send_reset_password_email(to_email: str, reset_token: str):
     configuration = sib_api_v3_sdk.Configuration()
     configuration.api_key['api-key'] = settings.BREVO_API_KEY
@@ -91,7 +89,7 @@ def send_verification_email_resend(to_email: str, verification_token: str):
     print("Sending verification email to: ", to_email)
     print("The verification token is: ", verification_token)
 
-    verification_link = f"{settings.FRONTEND_URL}/auth/verify-email?token={verification_token}"
+    verification_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
 
     sender = "GovLLMiner <no-reply@equalyz.ai>"
     subject = "GovLLMiner: Verify Your Email Address"
@@ -120,7 +118,7 @@ def send_verification_email_resend(to_email: str, verification_token: str):
 
 
 def send_reset_password_email_resend(to_email: str, reset_token: str):
-    reset_link = f"{settings.FRONTEND_URL}/auth/reset-password?token={reset_token}"
+    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
 
     sender = "GovLLMiner <no-reply@equalyz.ai>"
     subject = "GovLLMiner: Reset Your Password"

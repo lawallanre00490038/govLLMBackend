@@ -131,16 +131,19 @@ async def token(
         Send the user data to the user and sets access token in cookies.
     """
     print("The code is", form_data.code)
-    tok = form_data.code
+    google_token = form_data.code
 
-    user_data = jwt.decode(tok, options={"verify_signature": False})
-    print("The decoded token is", user_data)
+    try:
+        user_data = jwt.decode(google_token, options={"verify_signature": False})
+        print("The decoded token is", user_data)
 
-    request.session["user_data"] = user_data 
+        response = await validate(user_data, request, response, session)
 
-    response = await validate(user_data, request, response, session)
-
-    return response
+        return response
+    
+    except jwt.ExpiredSignatureError:
+        raise InvalidToken()
+   
 
 
 
@@ -261,17 +264,14 @@ async def validate(user_data: dict, request: Request, response: Optional[Respons
         print("The user from the validate function", user)
         if user:
             print("Following the path of existing user")
-        else:
+        elif not user:
             print("Following the path of new user")
 
             user_model = UserCreateModel(
                 email=user_data["email"],
-                password="password"
+                password="password1234"
             )
             user = await user_service.create_user(user_model, session, is_google=True) 
-
-        if not user:
-            raise HTTPException(status_code=500, detail="User creation failed")
         
         access_token_expires = timedelta(minutes=300)
         print("The user going into the access token is ", user)
