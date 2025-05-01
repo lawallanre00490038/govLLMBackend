@@ -408,3 +408,5 @@ def register_all_errors(app: FastAPI):
             },
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+

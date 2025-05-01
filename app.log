@@ -1,0 +1,23 @@
+2025-05-01 12:02:50,025 - govllminer.middleware - INFO - 127.0.0.1:62068 - GET /api/v1/docs - Status: 200 - Time: 0.00s
+2025-05-01 12:02:50,270 - govllminer.middleware - INFO - 127.0.0.1:62068 - GET /api/v1/openapi.json - Status: 200 - Time: 0.02s
+2025-05-01 12:03:00,507 - govllminer.middleware - INFO - 127.0.0.1:62069 - POST /api/v1/auth/signin - Status: 200 - Time: 2.94s
+2025-05-01 12:03:18,728 - govllminer.middleware - INFO - 127.0.0.1:62070 - POST /api/v1/auth/signin - Status: 400 - Time: 4.07s - Reason: {'message': 'Invalid Email Or Password', 'error_code': 'invalid_email_or_password'}
+2025-05-01 12:15:01,592 - govllminer.middleware - INFO - 127.0.0.1:62720 - GET /api/v1/docs - Status: 200 - Time: 0.00s
+2025-05-01 12:15:20,578 - govllminer.middleware - INFO - 127.0.0.1:62722 - GET /api/v1/openapi.json - Status: 200 - Time: 0.03s
+2025-05-01 12:16:58,073 - govllminer.middleware - INFO - 127.0.0.1:62818 - POST /api/v1/auth/signin - Status: 200 - Time: 2.09s
+2025-05-01 12:17:18,800 - govllminer.middleware - INFO - 127.0.0.1:62819 - POST /api/v1/auth/signin - Status: 400 - Time: 1.21s - Reason: {'message': 'Invalid Email Or Password', 'error_code': 'invalid_email_or_password'}
+2025-05-01 12:17:30,516 - govllminer.middleware - INFO - 127.0.0.1:62837 - POST /api/v1/auth/signin - Status: 400 - Time: 1.01s - Reason: {'message': 'Invalid Email Or Password', 'error_code': 'invalid_email_or_password'}
+2025-05-01 12:18:49,699 - govllminer.middleware - INFO - 127.0.0.1:62929 - POST /api/v1/auth/signin - Status: 400 - Time: 0.96s - Reason: {'message': 'Invalid Email Or Password', 'error_code': 'invalid_email_or_password'}
+2025-05-01 12:19:05,938 - govllminer.middleware - INFO - 127.0.0.1:62930 - POST /api/v1/auth/signin - Status: 400 - Time: 1.31s - Reason: {'message': 'Invalid Email Or Password', 'error_code': 'invalid_email_or_password'}
+2025-05-01 12:19:39,596 - govllminer.middleware - INFO - 127.0.0.1:62960 - POST /api/v1/auth/signin - Status: 200 - Time: 1.59s
+2025-05-01 12:25:27,042 - govllminer.middleware - INFO - 127.0.0.1:63250 - GET /api/v1/docs - Status: 200 - Time: 0.00s
+2025-05-01 12:25:44,360 - govllminer.middleware - INFO - 127.0.0.1:63252 - GET /api/v1/openapi.json - Status: 200 - Time: 0.08s
+2025-05-01 12:25:50,625 - govllminer.middleware - INFO - 127.0.0.1:63252 - POST /api/v1/auth/signin - Status: 200 - Time: 1.95s
+2025-05-01 12:28:23,489 - govllminer.middleware - INFO - 127.0.0.1:63363 - POST /api/v1/auth/signin - Status: 200 - Time: 1.20s
+2025-05-01 12:28:44,111 - govllminer.middleware - INFO - 127.0.0.1:63364 - POST /api/v1/auth/signin - Status: [92m200[0m - Time: 1.88s
+2025-05-01 12:31:00,342 - govllminer.middleware - INFO - 127.0.0.1:63468 - POST /api/v1/auth/signin - Status: [92m200[0m - Time: 1.69s
+2025-05-01 12:31:41,944 - govllminer.middleware - INFO - 127.0.0.1:63470 - POST /api/v1/auth/signin - Status: [92m200[0m - Time: 1.79s
+2025-05-01 12:31:51,578 - govllminer.middleware - INFO - 127.0.0.1:63503 - GET /api/v1/docs - Status: [92m200[0m - Time: 0.00s
+2025-05-01 12:31:51,985 - govllminer.middleware - INFO - 127.0.0.1:63503 - GET /api/v1/openapi.json - Status: [92m200[0m - Time: 0.02s
+2025-05-01 12:31:57,354 - govllminer.middleware - INFO - 127.0.0.1:63503 - POST /api/v1/auth/signin - Status: [92m200[0m - Time: 1.57s
+2025-05-01 12:32:08,618 - govllminer.middleware - INFO - 127.0.0.1:63504 - POST /api/v1/auth/signin - Status: [93m400[0m - Time: 1.34s - Reason: {'message': 'Invalid Email Or Password', 'error_code': 'invalid_email_or_password'}

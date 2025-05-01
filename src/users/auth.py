@@ -17,6 +17,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from .schemas import LoginResponseReadModel, TokenUser, UserModel
 from typing import Optional
+from passlib.hash import bcrypt
 
 passwd_context = CryptContext(schemes=["bcrypt"])
 ALGORITHM = "HS256"

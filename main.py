@@ -8,13 +8,9 @@ from contextlib import asynccontextmanager
 import logging
 from src.chat.routes import chat_router
 from src.chat.upload.routes import folder_router
+from src.logging_config import setup_logging
+setup_logging()
 
-# # logging.basicConfig(level=logging.DEBUG)
-# logging.basicConfig()    
-# logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
-
-import logging
-import httpx
 
 httpx_logger = logging.getLogger("httpx")
 httpx_logger.setLevel(logging.DEBUG)
@@ -105,6 +101,7 @@ if __name__ == "__main__":
         app="main:app",
         host="0.0.0.0",
         port=PORT,
-        reload=True if ENV == "development" else False,
+        reload=(ENV == "development"),
+        reload_excludes=["app.log"],
         proxy_headers=True
     )
