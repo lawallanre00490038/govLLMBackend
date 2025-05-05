@@ -1,4 +1,4 @@
-FROM python:3.11-alpine
+FROM python:latest
 
 # Install build dependencies (only if needed for pip installs)
 RUN apk add --no-cache gcc musl-dev libffi-dev
