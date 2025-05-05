@@ -15,7 +15,7 @@ import re
 
 from src.errors import ChatAPIError, NoChatHistoryFoundError, InvalidSessionId, DatabaseError, InvalidToken, ChatSessionSaveError, NoChatSessionsFound, FileUploadError, ChatUploadError, RAGQueryError, DirectQueryError
 from sqlalchemy.exc import SQLAlchemyError
-from .schemas import FolderUploadCreateModel, SessionListResponse, SessionResponse, ChatSessionResponse, ChatGeneralResponse
+from .schemas import FolderUploadCreateModel, SessionListResponse, SessionResponse, ChatSessionResponse, ChatGeneralResponse, GroupedChatResponseModel, SessionSchemaModel, MessageSchemaModel 
 from src.users.schemas import TokenUser
 
 
@@ -30,12 +30,11 @@ class ChatAPIClient:
             session: AsyncSession,
             endpoint: str,
             data: dict,
-            token: str,
-            session_id: Optional[uuid.UUID] = None
+            current_user: TokenUser,
         ):
-            if session_id:
+            if data.get("session_id"):
                 data["session_id"] = await self.replace_session_id_with_external_id(
-                    session_id=session_id,
+                    session_id=data.get("session_id"),
                     session=session
                 )
 
@@ -43,7 +42,7 @@ class ChatAPIClient:
                 response = await self.client.post(
                     f"{self.base_url}/{endpoint}",
                     json=data,
-                    headers={"Authorization": f"Bearer {token}"}
+                    headers={"Authorization": f"Bearer {current_user.access_token}"}
                 )
                 if response.status_code == 401:
                     raise InvalidToken()
@@ -53,9 +52,9 @@ class ChatAPIClient:
                 # Reuse or create chat session
                 chat_session = None
 
-                if session_id:
+                if data.get("session_id"):
                     session_result = await session.execute(
-                        select(ChatSession).where(ChatSession.id == session_id)
+                        select(ChatSession).where(ChatSession.id == data.get("session_id"))
                     )
                     chat_session = session_result.scalar_one_or_none()
                     if not chat_session:
@@ -67,7 +66,7 @@ class ChatAPIClient:
                     session_name = match.group(1) if match else result.get("response")[:50]
 
                     chat_session = ChatSession(
-                        user_id=data["user_id"],
+                        user_id=current_user.id,
                         session_name=session_name,
                         external_session_id=result.get("session_id")
                     )
@@ -160,7 +159,7 @@ class ChatAPIClient:
             """
             Replace the session ID with an external session ID.
             """
-            
+
             try:
                 result = await session.execute(
                     select(ChatSession.external_session_id).where(ChatSession.id == session_id)
@@ -180,53 +179,55 @@ class ChatAPIClient:
         self,
         user_id: uuid.UUID,
         session: AsyncSession,
-    ) -> dict:
+    ) -> GroupedChatResponseModel:
         """
-        Retrieve all chat messages grouped by session ID for a specific user.
+        Retrieve all chat messages grouped by session ID for a specific user,
+        and return as a GroupedChatResponseModel.
         """
-        # Query to fetch sessions and their messages
         try:
             query = (
                 select(ChatSession.id, ChatSession.session_name, ChatMessage)
                 .join(ChatMessage, ChatSession.id == ChatMessage.session_id)
                 .where(ChatSession.user_id == user_id)
-                .order_by(ChatMessage.created_at.desc()) 
+                .order_by(ChatMessage.created_at.desc())
             )
-        except Exception as e:
+        except Exception:
             raise DatabaseError()
 
         result = await session.execute(query)
         rows = result.all()
 
-        grouped_chats = {}
-        for row in rows:
-            session_id, session_name, message = row
+        grouped_chats: dict[uuid.UUID, dict] = {}
 
-            print(row)
-
+        for session_id, session_name, message in rows:
             if session_id not in grouped_chats:
                 grouped_chats[session_id] = {
                     "session_name": session_name,
                     "messages": []
                 }
-            grouped_chats[session_id]["messages"].append({
-                "message_id": message.id,
-                "sender": message.sender,
-                "content": message.content,
-                "created_at": message.created_at,
-            })
 
-        return {
-            "user_id": user_id,
-            "sessions": [
-                {
-                    "session_id": sid,
-                    "session_name": data["session_name"],
-                    "messages": data["messages"]
-                }
+            grouped_chats[session_id]["messages"].append(
+                MessageSchemaModel(
+                    message_id=message.id,
+                    sender=message.sender,
+                    content=message.content,
+                    created_at=message.created_at
+                )
+            )
+
+        # Build the response model directly
+        return GroupedChatResponseModel(
+            user_id=user_id,
+            sessions=[
+                SessionSchemaModel(
+                    session_id=sid,
+                    session_name=data["session_name"],
+                    messages=data["messages"]
+                )
                 for sid, data in grouped_chats.items()
             ]
-        }
+        )
+
     
 
     

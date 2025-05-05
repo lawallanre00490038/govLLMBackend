@@ -26,6 +26,7 @@ class MessageSchemaModel(BaseModel):
 
 class SessionSchemaModel(BaseModel):
     session_id: UUID
+    session_name: Optional[str] = None
     messages: List[MessageSchemaModel]
 
 class GroupedChatResponseModel(BaseModel):
@@ -41,6 +42,8 @@ class FolderUploadCreateModel(BaseModel):
 class ChatRequestSchema(BaseModel):
     message: str
     session_id: Optional[UUID] = None
+    document_id: Optional[str] = None
+    clear_history: Optional[bool] = False
 
 
 

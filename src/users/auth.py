@@ -145,3 +145,79 @@ def verify_email_response(user, access_token: str, response):
         message="User created successfully",
         data=user
     )
+
+
+
+
+
+
+
+
+
+
+
+# from fastapi import APIRouter, Request, HTTPException
+# from fastapi.responses import RedirectResponse
+# from src.config import settings
+# from src.db.main import get_session
+# from src.users.schemas import GetTokenRequest, GooglePayload
+# import uuid
+# from google.oauth2 import id_token
+# from google.auth.transport import requests
+# import httpx
+
+
+# async def google_login(code: str, request: Request):
+#     """
+#         This routes is automatically called by the google route
+#         Handle the Google sign/signup callback.
+#         Responsible for exchanging the code for an access token and validating the token.
+#         Send the user data to the user.
+#     """
+#     token_request_uri = "https://oauth2.googleapis.com/token"
+#     data = {
+#         'code': code,
+#         'client_id': settings.GOOGLE_CLIENT_ID,
+#         'client_secret': settings.GOOGLE_CLIENT_SECRET,
+#         'redirect_uri': "postmessage",
+#         'grant_type': 'authorization_code',
+#     }
+
+
+#     headers = {"Content-Type": "application/x-www-form-urlencoded"}
+#     async with httpx.AsyncClient() as client:
+#         response = await client.post(token_request_uri, data=data, headers=headers)
+#         response.raise_for_status()
+#         token_response = response.json()
+
+#     id_token_value = token_response.get('id_token')
+#     if not id_token_value:
+#         raise HTTPException(status_code=400, detail="Missing id_token in response.")
+
+#     try:
+#         id_info = id_token.verify_oauth2_token(
+#             id_token_value, requests.Request(), 
+#             settings.GOOGLE_CLIENT_ID,
+#             clock_skew_in_seconds=2
+#         )
+
+#         payload: GooglePayload = {
+#             "sub": id_info.get('sub'),
+#             "email": id_info.get('email'),
+#             "name": id_info.get('name'),
+#             "picture": id_info.get('picture'),
+#             "is_verified": id_info.get('email_verified'),
+#             "verification_token": str(uuid.uuid4())
+#         }
+
+#         # request.session["user_data"] = payload 
+#         # request.state.session = await get_session().__anext__() 
+#         # print("The payload is", payload)
+#         # response = await validate(request)
+#         return payload
+
+#     except ValueError as e:
+#         raise HTTPException(status_code=400, detail=f"Invalid id_token: {str(e)}")
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail="Internal Server Error")

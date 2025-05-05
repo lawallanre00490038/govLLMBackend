@@ -8,13 +8,11 @@ from contextlib import asynccontextmanager
 import logging
 from src.chat.routes import chat_router
 from src.chat.upload.routes import folder_router
+
+
 from src.logging_config import setup_logging
 setup_logging()
 
-
-httpx_logger = logging.getLogger("httpx")
-httpx_logger.setLevel(logging.DEBUG)
-httpx_logger.addHandler(logging.StreamHandler())
 
 
 version = "v1"

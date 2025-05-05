@@ -38,13 +38,11 @@ async def handle_chat(
           str: The response from the API.
     """
 
-    user_id = str(current_user.id)
     result = await chat_client.send_chat_request(
         session=session,
         endpoint="chat", 
-        data={"message": request.message, "user_id": user_id}, 
-        token=current_user.access_token,
-        session_id=request.session_id
+        data={"message": request.message, "session_id": request.session_id, "document_id": request.document_id, "clear_history": request.clear_history}, 
+        current_user=current_user
     )
 
     return ChatResponseSchema(
@@ -73,17 +71,18 @@ async def handle_chat(
 
     try:
       response = await chat_client.send_chat_request(
-          session=session,
-          endpoint="chat",
-          data={
-              "message": request.message,
-              "user_id": str(current_user.id)
-          },
-          token=current_user.access_token
+        session=session,
+        endpoint="chat", 
+        data={"message": request.message, 
+              "session_id": request.session_id, 
+              "document_id": request.document_id, 
+              "clear_history": request.clear_history
+            }, 
+        current_user=current_user
       )
 
       async def event_stream():
-          for word in response.split():
+          for word in response["response"].split():
               yield f"data: {word}\n\n"
               await asyncio.sleep(0.05)
 
@@ -102,29 +101,12 @@ async def get_grouped_chats(
     user_id: UUID,
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    
-    """ 
-      Fetch all chat sessions for a user and group them by session_id.
-      Args:
-          user_id (UUID): The user ID.
-      Returns:
-          GroupedChatResponse: The grouped chat response.
-    """
-    result = await chat_client.get_chats_by_user_grouped(user_id=user_id, session=session)
-    
-    return GroupedChatResponseModel(
-        user_id=result["user_id"],
-        sessions=[
-            SessionSchemaModel(session_id=s["session_id"], messages=[
-                MessageSchemaModel(**msg) for msg in s["messages"]
-            ])
-            for s in result["sessions"]
-        ]
-    )
+    return await chat_client.get_chats_by_user_grouped(user_id=user_id, session=session)
+
+
+
 
 # =============================================================================
-
-
 
 @chat_router.get("/sessions", response_model=SessionListResponse)
 async def get_user_sessions(
