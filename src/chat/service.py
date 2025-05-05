@@ -187,7 +187,7 @@ class ChatAPIClient:
         # Query to fetch sessions and their messages
         try:
             query = (
-                select(ChatSession.id, ChatMessage)
+                select(ChatSession.id, ChatSession.session_name, ChatMessage)
                 .join(ChatMessage, ChatSession.id == ChatMessage.session_id)
                 .where(ChatSession.user_id == user_id)
                 .order_by(ChatMessage.created_at.desc()) 
@@ -198,13 +198,18 @@ class ChatAPIClient:
         result = await session.execute(query)
         rows = result.all()
 
-        # Group messages by session ID
         grouped_chats = {}
         for row in rows:
-            session_id, message = row
+            session_id, session_name, message = row
+
+            print(row)
+
             if session_id not in grouped_chats:
-                grouped_chats[session_id] = []
-            grouped_chats[session_id].append({
+                grouped_chats[session_id] = {
+                    "session_name": session_name,
+                    "messages": []
+                }
+            grouped_chats[session_id]["messages"].append({
                 "message_id": message.id,
                 "sender": message.sender,
                 "content": message.content,
@@ -214,8 +219,12 @@ class ChatAPIClient:
         return {
             "user_id": user_id,
             "sessions": [
-                {"session_id": sid, "messages": msgs}
-                for sid, msgs in grouped_chats.items()
+                {
+                    "session_id": sid,
+                    "session_name": data["session_name"],
+                    "messages": data["messages"]
+                }
+                for sid, data in grouped_chats.items()
             ]
         }
     
@@ -504,35 +513,3 @@ class ChatAPIClient:
             return response.json()
         except Exception as e:
             raise ChatAPIError()
-
-
-        
-    async def get_chats_by_session(
-        self,
-        session_id: uuid.UUID,
-        session: AsyncSession,
-    ) -> List[Dict[str, Any]]:
-        """
-        Retrieve all chat messages for a specific session ID.
-        """
-        try:
-            query = (
-                select(ChatMessage)
-                .where(ChatMessage.session_id == session_id)
-                .order_by(ChatMessage.created_at.desc())  # oldest to newest
-            )
-            result = await session.execute(query)
-            messages = result.scalars().all()
-
-            return [
-                {
-                    "message_id": str(message.id),
-                    "sender": message.sender,
-                    "content": message.content,
-                    "created_at": message.created_at
-                }
-                for message in messages
-            ]
-
-        except SQLAlchemyError as e:
-            raise DatabaseError()
