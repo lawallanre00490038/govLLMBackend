@@ -62,6 +62,7 @@ class ChatResponseSchema(BaseModel):
     status: Optional[str] = "success"
     message: str
     session_id: Optional[UUID] = None
+    session_name: Optional[str] = None
     history: Optional[List[ChatTurn]] = None
 
 
@@ -118,3 +119,38 @@ class RagQueryResponse(BaseModel):
 
 class FeatureListResponse(BaseModel):
     features: List[str]
+
+
+
+
+# Session schemas
+
+
+class SessionResponse(BaseModel):
+    id: UUID
+    user_id: Optional[UUID]
+    session_name: Optional[str] = None
+    created_at: datetime
+
+# For a list response
+class SessionListResponse(BaseModel):
+    status: Optional[bool] = True
+    session: List[SessionResponse]
+
+
+class ChatTurn(BaseModel):
+    user: str
+    ai: Optional[str] = None
+
+class ChatSessionResponse(BaseModel):
+    status: Optional[bool] = True
+    session_id: UUID
+    session_name: Optional[str] = None
+    chat_history: List[ChatTurn]
+
+class ChatGeneralResponse(BaseModel):
+    status: Optional[bool] = True
+    message: str
+
+class SessionIdGeneralRequest(BaseModel):
+    session_id: UUID

@@ -8,6 +8,7 @@ from sqlmodel import Field, SQLModel, Column, Relationship
 from sqlalchemy import Enum
 from enum import Enum as PyEnum
 from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy import ForeignKey
 
 class ChatSession(SQLModel, table=True):
     __tablename__ = "chat_sessions"
@@ -22,12 +23,13 @@ class ChatSession(SQLModel, table=True):
     )
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="chat_sessions")
+    session_name: str = Field(nullable=True, default=None)
 
     external_session_id: Optional[str] = Field(default=None)
     created_at: datetime = Field(sa_column=Column(DateTime, default=datetime.utcnow))
     updated_at: datetime = Field(sa_column=Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow))
 
-    messages: List["ChatMessage"] = Relationship(back_populates="session")
+    messages: List["ChatMessage"] = Relationship(back_populates="session", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 
 class ChatMessage(SQLModel, table=True):
@@ -38,10 +40,17 @@ class ChatMessage(SQLModel, table=True):
             pg.UUID,
             nullable=False,
             primary_key=True,
-            default=uuid.uuid4
+            default=uuid.uuid4,
+            
         )
     )
-    session_id: uuid.UUID = Field(foreign_key="chat_sessions.id")
+    session_id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+            nullable=False
+        )
+    )
     session: ChatSession = Relationship(back_populates="messages")
 
     sender: str = Field(nullable=False)  # "user" or "ai"

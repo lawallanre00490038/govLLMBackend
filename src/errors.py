@@ -142,6 +142,14 @@ class AccountNotVerified(Exception):
     """Account not yet verified"""
     pass
 
+class InvalidSessionId(GovLLMiner):
+    """Invalid session ID"""
+    pass
+
+class NoChatHistoryFoundError(GovLLMiner):
+    """No chats history found"""
+    pass
+
 def create_exception_handler(
     status_code: int, initial_detail: Any
 ) -> Callable[[Request, Exception], JSONResponse]:
@@ -353,6 +361,29 @@ def register_all_errors(app: FastAPI):
     )
 
     app.add_exception_handler(
+        InvalidSessionId,
+        create_exception_handler(
+            status_code=status.HTTP_404_NOT_FOUND,
+            initial_detail={
+                "message": "Invalid session ID",
+                "error_code": "invalid_session_id",
+            },
+        )
+    )
+
+    app.add_exception_handler(
+        NoChatHistoryFoundError,
+        create_exception_handler(
+            status_code=status.HTTP_404_NOT_FOUND,
+            initial_detail={
+                "message": "No chat history found",
+                "error_code": "no_chats_found",
+            },
+        )
+
+    )
+
+    app.add_exception_handler(
         ChatUploadError,
         create_exception_handler(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -362,6 +393,8 @@ def register_all_errors(app: FastAPI):
             },
         ),
     )
+
+
 
     app.add_exception_handler(
         RAGQueryError,
@@ -408,5 +441,3 @@ def register_all_errors(app: FastAPI):
             },
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-
-

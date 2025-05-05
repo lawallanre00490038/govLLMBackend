@@ -11,7 +11,7 @@ from src.db.main import get_session
 from uuid import UUID
 from src.db.models import ChatMessage, User
 from fastapi import Form, Request, File, HTTPException
-from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel, ChatMessageHistory
+from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel, ChatMessageHistory, SessionListResponse, ChatSessionResponse, ChatGeneralResponse
 from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema, TopDocument, UploadResponseSchema, RagQueryResponse, FeatureListResponse
 from src.users.schemas import TokenUser
 from src.errors import ChatAPIError
@@ -50,6 +50,7 @@ async def handle_chat(
     return ChatResponseSchema(
         message=result.get("response", "No response"),
         session_id=result.get("session_id", None),
+        session_name=result.get("session_name", None),
         history=result.get("chat_history", []),
     )
 
@@ -120,6 +121,61 @@ async def get_grouped_chats(
             for s in result["sessions"]
         ]
     )
+
+# =============================================================================
+
+
+
+@chat_router.get("/sessions", response_model=SessionListResponse)
+async def get_user_sessions(
+    user: TokenUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get all sessions for a user.
+    """
+    return await chat_client.get_user_sessions(
+        user=user,
+        session=session
+    )
+
+
+
+@chat_router.get("/session/{session_id}", response_model=ChatSessionResponse)
+async def get_chat_by_session_id(session_id: str, session: AsyncSession = Depends(get_session)):
+    """
+    Get chats by session ID.
+    """
+    return await chat_client.get_chat_by_session_id(
+        session_id=session_id,
+        session=session
+    )
+
+
+@chat_router.delete("/session/{session_id}", response_model=ChatGeneralResponse)
+async def delete_session(session_id: str, session: AsyncSession = Depends(get_session)):
+    """
+    Delete a chat session.
+    """
+    return await chat_client.delete_session(
+        session_id=session_id,
+        session=session
+    )
+
+
+
+@chat_router.post("/clear-chat", response_model=ChatGeneralResponse)
+async def clear_all_user_chats(
+    user: TokenUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    return await chat_client.clear_all_user_chats(
+        user=user,
+        session=session
+    )
+
+
+# ====================================================================================
 
 
 @chat_router.post("/upload_file_with_chat", response_model=ChatResponseSchema, include_in_schema=True)
