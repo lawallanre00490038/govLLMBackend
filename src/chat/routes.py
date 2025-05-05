@@ -214,7 +214,7 @@ async def file_upload_with_chat(
     )
 
 
-@chat_router.post("/file/upload")
+@chat_router.post("/file/upload", response_model=UploadResponseSchema)
 async def upload_file(
     session: Annotated[AsyncSession, Depends(get_session)],
     file: UploadFile = File(...),

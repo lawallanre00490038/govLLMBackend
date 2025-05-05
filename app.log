@@ -3084,3 +3084,8 @@ AttributeError: 'dict' object has no attribute 'split'
 2025-05-05 12:14:07,181 - govllminer.middleware - INFO - 127.0.0.1:53480 - GET /api/v1/auth/users/me - Status: [92m200[0m - Time: 0.00s
 2025-05-05 12:20:43,148 - govllminer.middleware - INFO - 127.0.0.1:53747 - GET /api/v1/chat/aa81496c-94b3-4cfa-ab41-46d8bbbc53b2/chats - Status: [92m200[0m - Time: 3.29s
 2025-05-05 12:21:15,384 - govllminer.middleware - INFO - 127.0.0.1:53748 - GET /api/v1/chat/sessions - Status: [92m200[0m - Time: 0.78s
+2025-05-05 12:27:09,836 - govllminer.middleware - INFO - 127.0.0.1:54072 - GET /api/v1/docs - Status: [92m200[0m - Time: 0.00s
+2025-05-05 12:27:10,098 - govllminer.middleware - INFO - 127.0.0.1:54072 - GET /api/v1/openapi.json - Status: [92m200[0m - Time: 0.05s
+2025-05-05 12:27:20,482 - govllminer.middleware - INFO - 127.0.0.1:54073 - POST /api/v1/chat/list_features - Status: [92m200[0m - Time: 1.02s
+2025-05-05 12:29:45,302 - govllminer.middleware - INFO - 127.0.0.1:54186 - GET /api/v1/docs - Status: [92m200[0m - Time: 0.00s
+2025-05-05 12:29:45,477 - govllminer.middleware - INFO - 127.0.0.1:54186 - GET /api/v1/openapi.json - Status: [92m200[0m - Time: 0.00s

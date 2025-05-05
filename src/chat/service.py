@@ -175,6 +175,7 @@ class ChatAPIClient:
 
 
 
+
     async def get_chats_by_user_grouped(
         self,
         user_id: uuid.UUID,
@@ -230,7 +231,6 @@ class ChatAPIClient:
 
     
 
-    
 # =================================================================================================================
     async def get_user_sessions(self, user: TokenUser,  session: AsyncSession) -> SessionListResponse:
         """
