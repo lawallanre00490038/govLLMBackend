@@ -11,7 +11,7 @@ from src.db.main import get_session
 from uuid import UUID
 from src.db.models import ChatMessage, User
 from fastapi import Form, Request, File, HTTPException
-from .schemas import MessageSchemaModel, GroupedChatResponseModel, SessionSchemaModel, ChatMessageHistory, SessionListResponse, ChatSessionResponse, ChatGeneralResponse
+from .schemas import MessageSchemaModel, GroupedChatResponseModel, DocumentIDs, SessionSchemaModel, ChatMessageHistory, SessionListResponse, ChatSessionResponse, ChatGeneralResponse
 from .schemas import DirectQueryRequest, RagQueryRequest, ChatRequestSchema, ChatResponseSchema, TopDocument, UploadResponseSchema, RagQueryResponse, FeatureListResponse
 from src.users.schemas import TokenUser
 from src.errors import ChatAPIError
@@ -174,8 +174,8 @@ async def file_upload_with_chat(
     Upload a file to the chat service and save the chat interaction.
     """
 
-    if session_id:
-        external_session_id = await chat_client.replace_session_id_with_external_id(
+    if session_id not in (None, ""):
+        session_id = await chat_client.replace_session_id_with_external_id(
             session_id=session_id,
             session=session
         )
@@ -186,7 +186,7 @@ async def file_upload_with_chat(
         endpoint="chat/upload",
         file=file,
         message=message,
-        session_id=external_session_id,
+        session_id=session_id,
         document_id=document_id,
         clear_history=clear_history,
         token=current_user.access_token

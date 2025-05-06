@@ -397,7 +397,7 @@ class ChatAPIClient:
             return response.json()
         except Exception as e:
             print(f"Upload error: {e}")
-            raise ChatUploadError()
+            raise e
 
 
     async def proxy_file_upload_service(

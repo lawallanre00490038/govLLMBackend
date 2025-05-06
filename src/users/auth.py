@@ -142,7 +142,7 @@ def verify_email_response(user, access_token: str, response):
     print("User email verified successfully: ", new_user)
     return LoginResponseReadModel(
         status=True,
-        message="User created successfully",
+        message="User Logged In successfully",
         data=user
     )
 

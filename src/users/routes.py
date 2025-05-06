@@ -58,20 +58,9 @@ async def login(
         access_token = create_access_token(user=user)
 
          # Set the access token as a cookie
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            max_age=18000,
-            samesite="none",
-            secure=True,
-        )
+        result = verify_email_response(user, access_token, response)
+        return result
 
-        return LoginResponseReadModel(
-            status=True,
-            message="Login successful",
-            data=user
-        )
     except Exception as e:
         print("The error from the login function is", e)
         raise InvalidCredentials()

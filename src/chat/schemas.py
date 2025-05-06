@@ -61,6 +61,11 @@ class ChatTurn(BaseModel):
     sender: str
     content: str
     created_at: datetime
+
+
+class DocumentIDs(BaseModel):
+    document_ids: str
+
 class ChatResponseSchema(BaseModel):
     status: Optional[str] = "success"
     message: str
